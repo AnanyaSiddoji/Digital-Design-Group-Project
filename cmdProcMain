@@ -47,7 +47,7 @@ ARCHITECTURE command OF commandProcessor IS
  
  -----------------------------------------------------
   -- NEXT STATE LOGIC 
-  nextStateLogic: PROCESS(curState)
+ nextStateLogic: PROCESS(curState)
   BEGIN
   
     CASE curState IS
@@ -56,25 +56,25 @@ ARCHITECTURE command OF commandProcessor IS
         nextState <= A;
         
       WHEN A =>
-        nextState <= ;
+        nextState <= CHECK_NNN;
       
       WHEN L =>
-        nextState <= ;
+        nextState <= ECHO;
       
       WHEN P =>
-        nextState <= ;
+        nextState <= ECHO ;
       
       WHEN CHECK_NNN =>
-        nextState <= ;
+        nextState <= ECHO ;
   
       WHEN ECHO =>
-        nextState <= ;
+        nextState <= START ;
 
       WHEN START =>
-        nextState <= ;
+        nextState <= PRINT;
       
       WHEN PRINT =>
-        nextState <= ;
+        nextState <= IDLE;
     
       WHEN OTHERS => 
         nextState <= IDLE;  -- Accounts for undefined states 
