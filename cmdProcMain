@@ -2,13 +2,15 @@ LIBRARY ieee;
 USE ieee.std_logic_1164.ALL;
 USE ieee.numeric_std.ALL;
 USE work.common_pack.ALL;
-
-ENTITY commandProcessor IS
+-- NOTES:
+-- data_reg is not assigned to rxData 
+--
+ENTITY cmdProc IS
 PORT (
     clk:          IN std_logic;
     reset:        IN std_logic;
     rxnow:        IN std_logic;
-    rxData:       IN std_logic_vector (7 downto 0);
+    rxData:       IN std_logic_vector (7 downto 0); -- Data input 
     txData:       OUT std_logic_vector (7 downto 0);
     rxdone:       OUT std_logic;
     ovErr:        IN std_logic;
@@ -23,12 +25,14 @@ PORT (
     dataResults:  IN CHAR_ARRAY_TYPE(0 to RESULT_BYTE_NUM-1);
     seqDone:      IN std_logic
     );
-END commandProcessor;
+END cmdProc;
 
-ARCHITECTURE command OF commandProcessor IS 
+ARCHITECTURE command OF cmdProc IS 
  
+ -- STATE DECLARATION 
  TYPE STATE_TYPE IS (INIT, A, L, P, CHECK_NNN, ECHO, START, PRINT);
  SIGNAL curState, nextState: state_type;
+ SIGNAL data_reg: std_logic_vector(7 DOWNTO 0) := x"00"; -- Added signal data_reg for input to remain steady for at least 1 clock cycle 
    
 
  -----------------------------------------------------   
@@ -38,46 +42,56 @@ ARCHITECTURE command OF commandProcessor IS
     IF reset = '1' THEN
       curState <= INIT;
     ELSIF clk'EVENT AND clk = '1' THEN 
+      -- x_reg <= x;  
       curState <= nextState;
     END IF;
   END PROCESS;
- -----------------------------------------------------
-  -- COMBINATIONAL LOGIC 
- 
  
  -----------------------------------------------------
   -- NEXT STATE LOGIC 
- nextStateLogic: PROCESS(curState)
+  nextStateLogic: PROCESS(curState, data_reg)
   BEGIN
   
     CASE curState IS
   
       WHEN INIT =>
-        nextState <= A;
+        IF data_reg = x"41" OR data_reg = x"61" THEN -- Detects A or a
+          nextState <= A;                            -- waits for NNN to be typed to the terminal
+        
+        ELSIF data_reg = x"50" OR data_reg = x"70" THEN -- Detects P or p
+          nextState <= P;
+        
+        ELSIF data_reg = x"4C" OR data_reg = x"6C" THEN -- Detects L or l
+          nextState <= L;
+        
+        ELSE -- If not A, P, or L
+          nextState <= INIT;
+        END IF;  
+  
         
       WHEN A =>
-        nextState <= CHECK_NNN;
+        nextState <= ;
       
       WHEN L =>
-        nextState <= ECHO;
+        nextState <= ;
       
       WHEN P =>
-        nextState <= ECHO ;
+        nextState <= ;
       
       WHEN CHECK_NNN =>
-        nextState <= ECHO ;
+        nextState <= ;
   
       WHEN ECHO =>
-        nextState <= START ;
+        nextState <= ;
 
       WHEN START =>
-        nextState <= PRINT;
+        nextState <= ;
       
       WHEN PRINT =>
-        nextState <= IDLE;
+        nextState <= ;
     
       WHEN OTHERS => 
-        nextState <= IDLE;  -- Accounts for undefined states 
+        nextState <= INIT;  -- Accounts for undefined states 
     
     END CASE;
   END PROCESS;
@@ -85,7 +99,7 @@ ARCHITECTURE command OF commandProcessor IS
   -----------------------------------------------------
 
   -- NEXTSTATE OUTPUT LOGIC 
-  ctrlOut: PROCESS(curState)
+  ctrlOut: PROCESS(curState, data_reg)
   BEGIN
     -- assign default values
  
@@ -93,7 +107,7 @@ ARCHITECTURE command OF commandProcessor IS
       
       WHEN INIT =>
         nextState <= A;
-        
+ 
       WHEN A =>
         nextState <= ;
       
@@ -129,7 +143,8 @@ END; -- ARCHITECHTURE
 
   
   
-  
+
+ 
   
   
   
