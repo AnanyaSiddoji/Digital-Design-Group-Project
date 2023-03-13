@@ -1,0 +1,170 @@
+LIBRARY ieee;
+USE ieee.std_logic_1164.ALL;
+USE ieee.numeric_std.ALL;
+USE work.common_pack.ALL;
+
+ENTITY commandProcessor IS
+PORT (
+    clk:          IN std_logic;
+    reset:        IN std_logic;
+    rxnow:        IN std_logic;
+    rxData:       IN std_logic_vector (7 downto 0);
+    txData:       OUT std_logic_vector (7 downto 0);
+    rxdone:       OUT std_logic;
+    ovErr:        IN std_logic;
+    framErr:      IN std_logic;
+    txnow:        OUT std_logic;
+    txdone:       IN std_logic;
+    start:        OUT std_logic;
+    numWords_bcd: OUT BCD_ARRAY_TYPE(2 downto 0);
+    dataReady:    IN std_logic;
+    byte:         IN std_logic_vector(7 downto 0);
+    maxIndex:     IN BCD_ARRAY_TYPE(2 downto 0);
+    dataResults:  IN CHAR_ARRAY_TYPE(0 to RESULT_BYTE_NUM-1);
+    seqDone:      IN std_logic
+    );
+END commandProcessor;
+
+ARCHITECTURE command OF commandProcessor IS 
+ 
+ TYPE STATE_TYPE IS (INIT, A, L, P, CHECK_NNN, ECHO, START, PRINT);
+ SIGNAL curState, nextState: state_type;
+   
+
+ -----------------------------------------------------   
+  -- STATE REGISTERS 
+  State_register: PROCESS (reset, clk)
+  BEGIN
+    IF reset = '1' THEN
+      curState <= INIT;
+    ELSIF clk'EVENT AND clk = '1' THEN 
+      curState <= nextState;
+    END IF;
+  END PROCESS;
+ -----------------------------------------------------
+  -- COMBINATIONAL LOGIC 
+ 
+ 
+ -----------------------------------------------------
+  -- NEXT STATE LOGIC 
+  nextStateLogic: PROCESS(curState)
+  BEGIN
+  
+    CASE curState IS
+  
+      WHEN INIT =>
+        nextState <= A;
+        
+      WHEN A =>
+        nextState <= ;
+      
+      WHEN L =>
+        nextState <= ;
+      
+      WHEN P =>
+        nextState <= ;
+      
+      WHEN CHECK_NNN =>
+        nextState <= ;
+  
+      WHEN ECHO =>
+        nextState <= ;
+
+      WHEN START =>
+        nextState <= ;
+      
+      WHEN PRINT =>
+        nextState <= ;
+    
+      WHEN OTHERS => 
+        nextState <= IDLE;  -- Accounts for undefined states 
+    
+    END CASE;
+  END PROCESS;
+  
+  -----------------------------------------------------
+
+  -- NEXTSTATE OUTPUT LOGIC 
+  ctrlOut: PROCESS(curState)
+  BEGIN
+    -- assign default values
+ 
+    CASE curState IS
+      
+      WHEN INIT =>
+        nextState <= A;
+        
+      WHEN A =>
+        nextState <= ;
+      
+      WHEN L =>
+        nextState <= ;
+      
+      WHEN P =>
+        nextState <= ;
+      
+      WHEN CHECK_NNN =>
+        nextState <= ;
+  
+      WHEN ECHO =>
+        nextState <= ;
+
+      WHEN START =>
+        nextState <= ;
+      
+      WHEN PRINT =>
+        nextState <= ;
+      
+      WHEN OTHERS =>
+   
+   
+    END CASE;
+END PROCESS;
+  
+END; -- ARCHITECHTURE
+      
+      
+  
+  
+
+  
+  
+  
+  
+  
+  
+  
+  signal clk: std_logic := '0';
+  signal reset, sig_start, ctrl_genDriv, ctrl_consDriv, sig_dataReady, sig_seqDone: std_logic;
+  signal sig_rxDone, sig_rxNow, sig_ovErr, sig_framErr, sig_txNow, sig_txDone: std_logic;
+  signal sig_rx, sig_tx, sig_rx_debug: std_logic;
+  
+  signal sig_rxData, sig_txData, sig_byte: std_logic_vector(7 downto 0);
+  signal sig_maxIndex: BCD_ARRAY_TYPE(2 downto 0);
+  
+  signal sig_dataResults: CHAR_ARRAY_TYPE(0 to 6);
+  signal sig_numWords_bcd: BCD_ARRAY_TYPE(2 downto 0);
+  
+  signal sig_data: std_logic_vector(7 downto 0);
+    
+  constant SEQ_COUNT_MAX : integer := 1; -- defines how many runs to test
+  
+  type ARRAY3D_TYPE is array (0 to SEQ_COUNT_MAX) of CHAR_ARRAY_TYPE(0 to RESULT_BYTE_NUM-1);
+  type ARRAY3D_BCD_TYPE is array (0 to SEQ_COUNT_MAX) of BCD_ARRAY_TYPE(2 downto 0);
+  type SEQUENCE_TYPE is array (integer range<> ) of CHAR_ARRAY_TYPE(1 to 2);
+ 
+  constant sequence1 : SEQUENCE_TYPE(1 to 12) := (("00111001","00110101"),   --X"95"
+                                                  ("00110001","00110011"),   --X"13"
+                                                  ("00110110","00110000"),   --X"60"
+                                                  ("00110000","00111001"),   --X"09"
+                                                  ("00110110","00111000"),   --X"68"
+                                                  ("01000001","00111000"),   --X"A8"
+                                                  ("00111001","00110011"),   --X"93"
+                                                  ("01000110","00111001"),   --X"F9"
+                                                  ("00110111","00110001"),   --X"71"
+                                                  ("01000011","00110111"),   --X"C7"
+                                                  ("00111001","00110010"),   --X"92"
+                                                  ("00110000","00110110")   --X"06"
+                                                  );
+   
+
