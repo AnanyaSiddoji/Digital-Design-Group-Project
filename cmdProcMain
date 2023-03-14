@@ -134,6 +134,37 @@ ARCHITECTURE command OF cmdProc IS
    
     END CASE;
 END PROCESS;
+---------------------------------------------------
+----L printing process
+L: PROCESS(dataResults)
+BEGIN
+	IF dataReady = '1' THEN
+		IF txDone <= 1 THEN
+			txDone <= 0;
+			data <= dataResults;
+			txDone <= 1;
+		ELSE
+			WHILE txDone <= 0 THEN
+				data <= 0;
+			END
+		--dataResults to hexadecimal function
+	ELSE IF seqDone = '1' THEN
+		data <= dataResults;
+		--dataResults to hexadecimal function
+	END IF
+END PROCESS
+
+FUNCTION dataRes_to_Hex()
+	Res1 <= unsigned(std_logic_vector(8 downto 0));
+	Res2 <= unsigned(std_logic_vector(8 downto 0));
+	Res3 <= unsigned(std_logic_vector(8 downto 0));
+	Res4 <= unsigned(std_logic_vector(8 downto 0)); --peak and 3 values before and after
+	Res5 <= unsigned(std_logic_vector(8 downto 0));
+	Res6 <= unsigned(std_logic_vector(8 downto 0));
+	Res7 <= unsigned(std_logic_vector(8 downto 0));
+ -- need spaces in between each byte
+ -- after 8 bits add space
+--space seperate process??
   
 END; -- ARCHITECHTURE
       
