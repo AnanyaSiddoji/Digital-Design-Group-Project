@@ -147,24 +147,42 @@ BEGIN
 			WHILE txDone <= 0 THEN
 				data <= 0;
 			END
+		dataRes_to_Hex()
 		--dataResults to hexadecimal function
 	ELSE IF seqDone = '1' THEN
 		data <= dataResults;
+		dataRes_to_Hex()
 		--dataResults to hexadecimal function
 	END IF
 END PROCESS
-
+--------------------------------------------------------------------------------------
+--------- ASCII input from DP to hex output to Tx
 FUNCTION dataRes_to_Hex()
+	variable bin_num : integer range 0 to 15;
+	
 	Res1 <= unsigned(std_logic_vector(8 downto 0));
-	Res2 <= unsigned(std_logic_vector(8 downto 0));
-	Res3 <= unsigned(std_logic_vector(8 downto 0));
-	Res4 <= unsigned(std_logic_vector(8 downto 0)); --peak and 3 values before and after
-	Res5 <= unsigned(std_logic_vector(8 downto 0));
-	Res6 <= unsigned(std_logic_vector(8 downto 0));
-	Res7 <= unsigned(std_logic_vector(8 downto 0));
+	Res2 <= unsigned(std_logic_vector(16 downto 9));
+	Res3 <= unsigned(std_logic_vector(24 downto 17));
+	Res4 <= unsigned(std_logic_vector(32 downto 25)); --seperating peak and 3 values before and after
+	Res5 <= unsigned(std_logic_vector(40 downto 33));
+	Res6 <= unsigned(std_logic_vector(48 downto 41));
+	Res7 <= unsigned(std_logic_vector(56 downto 49));
+	
+	Res1_1 <= unsigned(std_logic_vector(4 downto 0)); --need a way to put this into a loop so code doesn't repeat
+	Res1_2 <= unsigned(std_logic_vector(8 downto 5)); --split into 4 bits each
+	
+	bin_num := to_integer(unsigned(ascii_in));
+	case bin_num is
+      		WHEN 0 to 9   => 
+			hex_out <= std_logic_vector(to_unsigned(bin_num, 4));
+      		WHEN 10 to 15 => 
+			hex_out <= std_logic_vector(to_unsigned(bin_num + 7, 4));
+      		WHEN others  => 
+			hex_out <= (others => '0');
+    	end case;
+	
  -- need spaces in between each byte
  -- after 8 bits add space
---space seperate process??
   
 END; -- ARCHITECHTURE
       
