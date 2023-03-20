@@ -30,13 +30,16 @@ END cmdProc;
 ARCHITECTURE command OF cmdProc IS
  
  -- STATE DECLARATION
- TYPE STATE_TYPE IS (INIT, RECEIVING,WAIT_NNN, L, P, CHECK_NNN, ECHO, START, PRINT);
+ TYPE STATE_TYPE IS (INIT, RECEIVING,WAIT_NNN, WAIT_BYTES, EQUAL_NNN, RECEIVE_BYTES, TRANSMIT_BYTES, L, P, CHECK_NNN, ECHO, START, PRINT);
  SIGNAL curState, nextState: state_type;
  SIGNAL data_reg: std_logic_vector(7 DOWNTO 0); -- Added signal data_reg for input to remain steady for at least 1 clock cycle
  
  -- COUNTER SIGNALS  
  SIGNAL validCount: integer range 0 to 3;
- SIGNAL en_validCount, res_validCount: bit;  
+ SIGNAL en_validCount, res_validCount: bit;
+ 
+ SIGNAL dataReadyCount: integer range 0 to ; -- FIND RANGE
+ SIGNAL res_dataReadyCount, en_dataReadyCount: bit;
  
  -- SIGNAL TO CHECK FOR NNN
  SIGNAL BOOL_N1, BOOL_N2, BOOL_N3: BOOLEAN := FALSE;
@@ -88,6 +91,14 @@ BEGIN
     END IF;
   END IF;
 END PROCESS;
+
+dataReady_counter: PROCESS(reset, res_dataReadyCount, en_dataReadyCount, clk, dataReady)
+BEGIN
+  IF reset = '1' OR res_dataReadyCount = '1' THEN
+      dataReadyCount <= 0;
+  END IF;
+END PROCESS;
+ 
 -----------------------------------------------------
 NNN_CHECK: PROCESS(validCount, clk)
 BEGIN
@@ -108,26 +119,26 @@ BEGIN
       numWords_bcd(0) <= n1(3 DOWNTO 0);
       numWords_bcd(1) <= n2(3 DOWNTO 0);
       numWords_bcd(2) <= n3(3 DOWNTO 0);
-      BOOL_N1 <= TRUE; 
+      BOOL_N1 <= TRUE;
       BOOL_N2 <= TRUE;
       BOOL_N3 <= TRUE;
-      
+     
     ELSE
       numWords_bcd(0) <= "0000";
       numWords_bcd(1) <= "0000";
       numWords_bcd(2) <= "0000";
-      BOOL_N1 <= FALSE; 
+      BOOL_N1 <= FALSE;
       BOOL_N2 <= FALSE;
       BOOL_N3 <= FALSE;
-      nextState <= INIT; -- REMOVE 
+      nextState <= INIT; -- REMOVE
   ELSE
     numWords_bcd(0) <= "0000";
     numWords_bcd(1) <= "0000";
     numWords_bcd(2) <= "0000";
-    BOOL_N1 <= FALSE; 
+    BOOL_N1 <= FALSE;
     BOOL_N2 <= FALSE;
     BOOL_N3 <= FALSE;
-    nextState <= INIT; -- REMOVE 
+    nextState <= INIT; -- REMOVE
      
     END IF;
   END IF;
@@ -146,7 +157,7 @@ END PROCESS;
         ELSIF rxNow = '0' THEN
           nextState <= INIT;
       END IF;
-         
+   
  
       WHEN RECEIVING =>
         IF data_reg = X"41" OR data_reg = X"61" THEN -- Detects A or a
@@ -181,19 +192,50 @@ END PROCESS;
         en_validCount = '0';
         IF BOOL_N1 = TRUE OR BOOL_N2 = TRUE THEN
           nextState <= WAIT_NNN;
-        ELSE 
+        ELSE
           nextState <= INIT;
-        
+       
         IF BOOL_N3 = TRUE THEN
-          nextState <= ; -- ADD NEXT STATE 
-        ELSE 
+          nextState <= START; -- ADD NEXT STATE
+        ELSE
           nextState <= INIT;
  
       WHEN ECHO =>
         nextState <= ;
 
       WHEN START =>
-        nextState <= ;
+        start = '1'; -- NOTE: start is initialized as 0 hence should only be HIGH for 1 clk cycle
+        nextState <= WAIT_BYTES;
+
+      WHEN WAIT_BYTES =>
+        en_dataReadyCount = '0';
+        IF dataReady = '1' THEN
+          nextState <= RECEIVE_BYTES;
+        ELSIF dataReady = '0' THEN
+          nextState <= WAIT_BYTES;
+        END IF;
+     
+      WHEN RECEIVE_BYTES =>
+        en_dataReadyCount = '1';
+        nextState <= TRANSMIT_BYTES;
+     
+      WHEN TRANSMIT_BYTES =>
+        en_dataReadyCount = '0';
+        IF txDone = '1' THEN
+          txNow = '0';
+          nextState <= TRANSMIT_BYTES;
+        ELSIF txDone = '0' THEN
+          txNow = '1';
+          nextState <= EQUAL_NNN;
+        END IF;
+     
+      WHEN EQUAL_NNN =>
+        IF dataReadyCount = NNN THEN -- NOTE: 'NNN' is not defined yet but it represents the integer value of BCD_numWords (type: array)
+          res_dataReadyCount = '1'; -- CHECK MIGHT NEED TO RESET IN NEXT STATE
+          nextState <= ; -- GO TO NEXT STATE
+        ELSIF dataReadyCount /= NNN THEN -- If its not equal to NNN
+          nextState <= WAIT_BYTES;
+        END IF;
      
       WHEN PRINT =>
         nextState <= ;
@@ -213,11 +255,10 @@ END PROCESS;
    
     start  <= '0';
     rxDone <= '0';
-    rxnow <= '1'; -- equivalent to 'valid'
+    --rxnow <= '1'; -- equivalent to 'valid'
     txNow  <= '0';
-    txdone <= '1';
     seqDone <= '0';
-    dataReady <= '1';
+
  
     CASE curState IS
      
@@ -300,9 +341,11 @@ FUNCTION dataRes_to_Hex()
 	
  -- need spaces in between each byte
  -- after 8 bits add space
+
  
 END; -- ARCHITECHTURE
-     
-     
+
+
+
 
 
