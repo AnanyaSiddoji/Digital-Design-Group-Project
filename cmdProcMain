@@ -3,14 +3,14 @@ USE ieee.std_logic_1164.ALL;
 USE ieee.numeric_std.ALL;
 USE work.common_pack.ALL;
 -- NOTES:
--- data_reg is not assigned to rxData 
+-- data_reg is not assigned to rxData (ASK TA IF ITS IMPLEMENTED CORRECTLY !!!)
 --
 ENTITY cmdProc IS
 PORT (
     clk:          IN std_logic;
     reset:        IN std_logic;
     rxnow:        IN std_logic;
-    rxData:       IN std_logic_vector (7 downto 0); -- Data input 
+    rxData:       IN std_logic_vector (7 downto 0); -- Data input
     txData:       OUT std_logic_vector (7 downto 0);
     rxdone:       OUT std_logic;
     ovErr:        IN std_logic;
@@ -27,208 +27,234 @@ PORT (
     );
 END cmdProc;
 
-ARCHITECTURE command OF cmdProc IS 
+ARCHITECTURE command OF cmdProc IS
  
- -- STATE DECLARATION 
- TYPE STATE_TYPE IS (INIT, A, L, P, CHECK_NNN, ECHO, START, PRINT);
+ -- STATE DECLARATION
+ TYPE STATE_TYPE IS (INIT, RECEIVING,WAIT_NNN, L, P, CHECK_NNN, ECHO, START, PRINT);
  SIGNAL curState, nextState: state_type;
- SIGNAL data_reg: std_logic_vector(7 DOWNTO 0) := x"00"; -- Added signal data_reg for input to remain steady for at least 1 clock cycle 
-   
+ SIGNAL data_reg: std_logic_vector(7 DOWNTO 0); -- Added signal data_reg for input to remain steady for at least 1 clock cycle
+ 
+ -- COUNTER SIGNALS  
+ SIGNAL validCount: integer range 0 to 3;
+ SIGNAL en_validCount, res_validCount: bit;  
+ 
+ -- SIGNAL TO CHECK FOR NNN
+ SIGNAL BOOL_N1, BOOL_N2, BOOL_N3: BOOLEAN := FALSE;
 
- -----------------------------------------------------   
-  -- STATE REGISTERS 
+-----------------------------------------------------  
+  -- STATE REGISTERS
   State_register: PROCESS (reset, clk)
   BEGIN
     IF reset = '1' THEN
       curState <= INIT;
-    ELSIF clk'EVENT AND clk = '1' THEN 
-      -- x_reg <= x;  
+    ELSIF clk'EVENT AND clk = '1' THEN
+      data_reg <= rxData;  
       curState <= nextState;
     END IF;
   END PROCESS;
+-----------------------------------------------------
+-- CONVERSIONS
+byteToHex: PROCESS(byte)
+BEGIN
+  byte1 <= to_integer(unsigned(byte(7 DOWNTO 4)));
+  byte2 <= to_integer(unsigned(byte(3 DOWNTO 0)));
+   
+  IF ((byte1 >= 0) OR ((byte2 >= 0) AND (byte1 <= 9)) OR (byte2 <= 9)) THEN
+    byteOut1 <= '0011' & byte(7 DOWNTO 4);
+    byteOut2 <= '0011' & byte(3 DOWNTO 0);
+
+  ELSIF (byte1 >= 10) OR ((byte2 >= 10) AND (byte1 <= 15)) OR ((byte2 >= 15) THEN
+    byteOut1 <= '0100' & byte(7 DOWNTO 4);  -- A, B, C, D, E, F
+    byteOut2 <= '0100' & byte(3 DOWNTO 0);  -- A, B, C, D, E, F
+
+  END IF;
  
- -----------------------------------------------------
-  -- NEXT STATE LOGIC 
+END PROCESS;
+ 
+-----------------------------------------------------
+-- COUNTERS
+NNN_counter: PROCESS(reset, res_validCount, en_validCount, clk, rxnow)
+BEGIN
+  IF reset = '1' OR res_validCount = '1' THEN
+      validCount <= 0;
+ 
+  ELSIF clk'EVENT AND clk = '1' THEN
+    IF en_validCount = '1' AND curState = WAIT_NNN THEN
+      IF rxnow = '1' THEN
+        validCount <= validCount + 1;
+      ELSE
+        validCount <= validCount;
+      END IF;
+    END IF;
+  END IF;
+END PROCESS;
+-----------------------------------------------------
+NNN_CHECK: PROCESS(validCount, clk)
+BEGIN
+  IF validCount = 1 THEN
+    n1 <= data_reg;
+  ELSIF validCount = 2 THEN
+    n2 <= data_reg;
+  ELSIF validCount = 3 THEN
+    n3 <= data_reg;
+  END IF;
+     
+  IF n1(7 DOWNTO 4) = '0011' AND n2(7 DOWNTO 4) = '0011' AND n3(7 DOWNTO 4) = '0011' THEN
+    num1 <= to_integer(n1(3 DOWNTO 0));
+    num2 <= to_integer(n2(3 DOWNTO 0));
+    num3 <= to_integer(n3(3 DOWNTO 0));
+       
+    IF (num1 >= 0) AND (num2>= 0) AND (num3 >= 0) AND (num1<= 9) AND (num2<= 9) AND (num3<= 9) THEN
+      numWords_bcd(0) <= n1(3 DOWNTO 0);
+      numWords_bcd(1) <= n2(3 DOWNTO 0);
+      numWords_bcd(2) <= n3(3 DOWNTO 0);
+      BOOL_N1 <= TRUE; 
+      BOOL_N2 <= TRUE;
+      BOOL_N3 <= TRUE;
+      
+    ELSE
+      numWords_bcd(0) <= "0000";
+      numWords_bcd(1) <= "0000";
+      numWords_bcd(2) <= "0000";
+      BOOL_N1 <= FALSE; 
+      BOOL_N2 <= FALSE;
+      BOOL_N3 <= FALSE;
+      nextState <= INIT; -- REMOVE 
+  ELSE
+    numWords_bcd(0) <= "0000";
+    numWords_bcd(1) <= "0000";
+    numWords_bcd(2) <= "0000";
+    BOOL_N1 <= FALSE; 
+    BOOL_N2 <= FALSE;
+    BOOL_N3 <= FALSE;
+    nextState <= INIT; -- REMOVE 
+     
+    END IF;
+  END IF;
+END PROCESS;
+
+-----------------------------------------------------
+  -- NEXT STATE LOGIC
   nextStateLogic: PROCESS(curState, data_reg)
   BEGIN
-  
+ 
     CASE curState IS
-  
+ 
       WHEN INIT =>
-        IF data_reg = x"41" OR data_reg = x"61" THEN -- Detects A or a
-          nextState <= A;                            -- waits for NNN to be typed to the terminal
-        
-        ELSIF data_reg = x"50" OR data_reg = x"70" THEN -- Detects P or p
+        IF rxNow = '1' THEN
+          nextState <= RECEIVING;
+        ELSIF rxNow = '0' THEN
+          nextState <= INIT;
+      END IF;
+         
+ 
+      WHEN RECEIVING =>
+        IF data_reg = X"41" OR data_reg = X"61" THEN -- Detects A or a
+          nextState <= WAIT_NNN;                            -- waits for NNN to be typed to the terminal
+       
+        ELSIF data_reg = X"50" OR data_reg = X"70" THEN -- Detects P or p
           nextState <= P;
-        
-        ELSIF data_reg = x"4C" OR data_reg = x"6C" THEN -- Detects L or l
+       
+        ELSIF data_reg = X"4C" OR data_reg = X"6C" THEN -- Detects L or l
           nextState <= L;
-        
+       
         ELSE -- If not A, P, or L
           nextState <= INIT;
         END IF;  
-  
-        
-      WHEN A =>
-        nextState <= ;
-      
-      WHEN L =>
-        nextState <= ;
-      
-      WHEN P =>
-        nextState <= ;
-      
+       
+      WHEN WAIT_NNN =>
+        en_validCount = '0';
+        IF rxNow = '1' THEN
+          en_validCount = '1';
+          nextState <= CHECK_NNN;
+        ELSIF rxNow = '0' THEN
+          nextState <= WAIT_NNN;
+        END IF;
+     
+      WHEN L_PRINT =>
+        nextState <= ECHO;
+     
+      WHEN P_PRINT =>
+        nextState <= ECHO;
+     
       WHEN CHECK_NNN =>
-        nextState <= ;
-  
+        en_validCount = '0';
+        IF BOOL_N1 = TRUE OR BOOL_N2 = TRUE THEN
+          nextState <= WAIT_NNN;
+        ELSE 
+          nextState <= INIT;
+        
+        IF BOOL_N3 = TRUE THEN
+          nextState <= ; -- ADD NEXT STATE 
+        ELSE 
+          nextState <= INIT;
+ 
       WHEN ECHO =>
         nextState <= ;
 
       WHEN START =>
         nextState <= ;
-      
+     
       WHEN PRINT =>
         nextState <= ;
-    
-      WHEN OTHERS => 
-        nextState <= INIT;  -- Accounts for undefined states 
-    
+   
+      WHEN OTHERS =>
+        nextState <= INIT;  -- Accounts for undefined states
+   
     END CASE;
   END PROCESS;
-  
+ 
   -----------------------------------------------------
 
-  -- NEXTSTATE OUTPUT LOGIC 
+  -- NEXTSTATE OUTPUT LOGIC
   ctrlOut: PROCESS(curState, data_reg)
   BEGIN
     -- assign default values
+   
+    start  <= '0';
+    rxDone <= '0';
+    rxnow <= '1'; -- equivalent to 'valid'
+    txNow  <= '0';
+    txdone <= '1';
+    seqDone <= '0';
+    dataReady <= '1';
  
     CASE curState IS
-      
+     
       WHEN INIT =>
         nextState <= A;
  
       WHEN A =>
         nextState <= ;
-      
+     
       WHEN L =>
         nextState <= ;
-      
+     
       WHEN P =>
         nextState <= ;
-      
+     
       WHEN CHECK_NNN =>
-        nextState <= ;
-  
+ 
+ 
       WHEN ECHO =>
         nextState <= ;
 
       WHEN START =>
         nextState <= ;
-      
+     
       WHEN PRINT =>
         nextState <= ;
-      
+     
       WHEN OTHERS =>
    
    
     END CASE;
 END PROCESS;
----------------------------------------------------
-----L printing process
-L: PROCESS(dataResults)
-BEGIN
-	IF dataReady = '1' THEN
-		IF txDone <= 1 THEN
-			txDone <= 0;
-			data <= dataResults;
-			txDone <= 1;
-		ELSE
-			WHILE txDone <= 0 THEN
-				data <= 0;
-			END
-		dataRes_to_Hex()
-		--dataResults to hexadecimal function
-	ELSE IF seqDone = '1' THEN
-		data <= dataResults;
-		dataRes_to_Hex()
-		--dataResults to hexadecimal function
-	END IF
-END PROCESS
---------------------------------------------------------------------------------------
---------- ASCII input from DP to hex output to Tx
-FUNCTION dataRes_to_Hex()
-	variable bin_num : integer range 0 to 15;
-	
-	Res1 <= unsigned(std_logic_vector(8 downto 0));
-	Res2 <= unsigned(std_logic_vector(16 downto 9));
-	Res3 <= unsigned(std_logic_vector(24 downto 17));
-	Res4 <= unsigned(std_logic_vector(32 downto 25)); --seperating peak and 3 values before and after
-	Res5 <= unsigned(std_logic_vector(40 downto 33));
-	Res6 <= unsigned(std_logic_vector(48 downto 41));
-	Res7 <= unsigned(std_logic_vector(56 downto 49));
-	
-	Res1_1 <= unsigned(std_logic_vector(4 downto 0)); --need a way to put this into a loop so code doesn't repeat
-	Res1_2 <= unsigned(std_logic_vector(8 downto 5)); --split into 4 bits each
-	
-	bin_num := to_integer(unsigned(ascii_in));
-	case bin_num is
-      		WHEN 0 to 9   => 
-			hex_out <= std_logic_vector(to_unsigned(bin_num, 4));
-      		WHEN 10 to 15 => 
-			hex_out <= std_logic_vector(to_unsigned(bin_num + 7, 4));
-      		WHEN others  => 
-			hex_out <= (others => '0');
-    	end case;
-	
- -- need spaces in between each byte
- -- after 8 bits add space
-  
+
+
+ 
 END; -- ARCHITECHTURE
-      
-      
-  
-  
+     
+     
 
-  
-  
-
- 
-  
-  
-  
-  
-  signal clk: std_logic := '0';
-  signal reset, sig_start, ctrl_genDriv, ctrl_consDriv, sig_dataReady, sig_seqDone: std_logic;
-  signal sig_rxDone, sig_rxNow, sig_ovErr, sig_framErr, sig_txNow, sig_txDone: std_logic;
-  signal sig_rx, sig_tx, sig_rx_debug: std_logic;
-  
-  signal sig_rxData, sig_txData, sig_byte: std_logic_vector(7 downto 0);
-  signal sig_maxIndex: BCD_ARRAY_TYPE(2 downto 0);
-  
-  signal sig_dataResults: CHAR_ARRAY_TYPE(0 to 6);
-  signal sig_numWords_bcd: BCD_ARRAY_TYPE(2 downto 0);
-  
-  signal sig_data: std_logic_vector(7 downto 0);
-    
-  constant SEQ_COUNT_MAX : integer := 1; -- defines how many runs to test
-  
-  type ARRAY3D_TYPE is array (0 to SEQ_COUNT_MAX) of CHAR_ARRAY_TYPE(0 to RESULT_BYTE_NUM-1);
-  type ARRAY3D_BCD_TYPE is array (0 to SEQ_COUNT_MAX) of BCD_ARRAY_TYPE(2 downto 0);
-  type SEQUENCE_TYPE is array (integer range<> ) of CHAR_ARRAY_TYPE(1 to 2);
- 
-  constant sequence1 : SEQUENCE_TYPE(1 to 12) := (("00111001","00110101"),   --X"95"
-                                                  ("00110001","00110011"),   --X"13"
-                                                  ("00110110","00110000"),   --X"60"
-                                                  ("00110000","00111001"),   --X"09"
-                                                  ("00110110","00111000"),   --X"68"
-                                                  ("01000001","00111000"),   --X"A8"
-                                                  ("00111001","00110011"),   --X"93"
-                                                  ("01000110","00111001"),   --X"F9"
-                                                  ("00110111","00110001"),   --X"71"
-                                                  ("01000011","00110111"),   --X"C7"
-                                                  ("00111001","00110010"),   --X"92"
-                                                  ("00110000","00110110")   --X"06"
-                                                  );
-   
 
