@@ -30,7 +30,8 @@ END cmdProc;
 ARCHITECTURE command OF cmdProc IS
  
  -- STATE DECLARATION
- TYPE STATE_TYPE IS (INIT, RECEIVING,WAIT_NNN, WAIT_BYTES, EQUAL_NNN, RECEIVE_BYTES, TRANSMIT_BYTES, L_PRINT, P_PRINT, CHECK_NNN, START);
+ TYPE STATE_TYPE IS (INIT, ECHO, L_CARRIAGE, P_CARRIAGE, L_DASH, P_DASH, RECEIVING, WAIT_NNN, P_PRINT,
+ L_PRINT, CHECK_NNN, NEW_LINE, ANNN_DASH, S_START, WAIT_BYTES, RECEIVE_BYTES, TRANSMIT_BYTES, EQUAL_NNN);
  SIGNAL curState, nextState: state_type;
  SIGNAL data_reg: std_logic_vector(7 DOWNTO 0); -- Added signal data_reg for input to remain steady for at least 1 clock cycle
  
@@ -44,16 +45,39 @@ ARCHITECTURE command OF cmdProc IS
  -- SIGNAL TO CHECK FOR NNN
  SIGNAL BOOL_N1, BOOL_N2, BOOL_N3: BOOLEAN := FALSE;
  
- SIGNAL L_array: CHAR_ARRAY_TYPE(0 to 20); -- CHECK IF DEFINED CORRECTLY !!!
- SIGNAL P_array: CHAR_ARRAY_TYPE(0 to 5);
+ -- ARRAY SIGNALS
+ SIGNAL L_array: CHAR_ARRAY_TYPE(20 downto 0); -- CHECK IF DEFINED CORRECTLY !!!
+ SIGNAL P_array: CHAR_ARRAY_TYPE(5 downto 0);
+ SIGNAL byte_array: CHAR_ARRAY_TYPE(1 downto 0);
+ 
+ -- DEFINED INTEGER SIGNALS USED IN PROCESSES
+ -- PROCESS byteToHex
+ SIGNAL byte1: integer; -- IF RANGE REQUIRED TILL 15
+ SIGNAL byte2: integer;
+ SIGNAL byteOut1: std_logic_vector(7 DOWNTO 0);
+ SIGNAL byteOut2: std_logic_vector(7 DOWNTO 0);
+ 
+ -- PROCESS dataRes_to_Hex
+ SIGNAL Res: std_logic_vector(7 DOWNTO 0);
+ SIGNAL data1: integer;
+ SIGNAL data2: integer;
+ 
+ -- PROCESS NNN_CHECK
+ SIGNAL n1: std_logic_vector(7 DOWNTO 0);
+ SIGNAL n2: std_logic_vector(7 DOWNTO 0);
+ SIGNAL n3: std_logic_vector(7 DOWNTO 0);
+ SIGNAL num1: integer;
+ SIGNAL num2: integer;
+ SIGNAL num3: integer;
+
 -----------------------------------------------------  
   -- STATE REGISTERS
-  State_register: PROCESS (reset, clk)
+  State_register: PROCESS (reset, clk, curState, rxData, data_reg, nextState)
   BEGIN
     IF reset = '1' THEN
       curState <= INIT;
     ELSIF clk'EVENT AND clk = '1' THEN
-      data_reg <= rxData;  
+      data_reg <= rxData;  -- CREATING A REGISTER TO STORE rxData STABALIZING THE MACHINE
       curState <= nextState;
     END IF;
   END PROCESS;
@@ -61,32 +85,32 @@ ARCHITECTURE command OF cmdProc IS
 -- CONVERSIONS
 byteToHex: PROCESS(byte)
 BEGIN
-  byte1 <= to_integer(unsigned(byte(7 DOWNTO 4))); -- CHECK IF YOU NEED TO DEFINE AS VARIABLES !!!
+  byte1 <= to_integer(unsigned(byte(7 DOWNTO 4)));
   byte2 <= to_integer(unsigned(byte(3 DOWNTO 0)));
    
   IF ((byte1 >= 0) OR ((byte2 >= 0) AND (byte1 <= 9)) OR (byte2 <= 9)) THEN
-    byteOut1 <= '0011' & byte(7 DOWNTO 4);
-    byteOut2 <= '0011' & byte(3 DOWNTO 0);
+    byteOut1 <= "0011" & byte(7 DOWNTO 4);
+    byteOut2 <= "0011" & byte(3 DOWNTO 0);
 
   ELSIF (byte1 >= 10) OR ((byte2 >= 10) AND (byte1 <= 15)) OR ((byte2 >= 15) THEN
-    IF byte1 = 10`OR byte2 = 10 THEN
-      byteOut1 <= ; X"41" -- A
-      byteOut2 <= ; X"41" -- A
-    ELSIF byte1 = 11`OR byte2 = 11 THEN
-      byteOut1 <= ; X"42" -- B
-      byteOut2 <= ; X"42" -- B
-    ELSIF byte1 = 12`OR byte2 = 12 THEN
-      byteOut1 <= ; X"43" -- C
-      byteOut2 <= ; X"43" -- C
-    ELSIF byte1 = 13`OR byte2 = 13 THEN
-      byteOut1 <= ; X"44" -- D
-      byteOut2 <= ; X"44" -- D
-    ELSIF byte1 = 14`OR byte2 = 14 THEN
-      byteOut1 <= ; X"45" -- E
-      byteOut2 <= ; X"45" -- E
-    ELSIF byte1 = 15`OR byte2 = 14 THEN
-      byteOut1 <= ; X"46" -- F
-      byteOut2 <= ; X"46" -- F
+    IF byte1 = 10 OR byte2 = 10 THEN
+      byteOut1 <= X"41"; -- A
+      byteOut2 <= X"41"; -- A
+    ELSIF byte1 = 11 OR byte2 = 11 THEN
+      byteOut1 <= X"42"; -- B
+      byteOut2 <= X"42"; -- B
+    ELSIF byte1 = 12 OR byte2 = 12 THEN
+      byteOut1 <= X"43"; -- C
+      byteOut2 <= X"43"; -- C
+    ELSIF byte1 = 13 OR byte2 = 13 THEN
+      byteOut1 <= X"44"; -- D
+      byteOut2 <= X"44"; -- D
+    ELSIF byte1 = 14 OR byte2 = 14 THEN
+      byteOut1 <= X"45"; -- E
+      byteOut2 <= X"45"; -- E
+    ELSIF byte1 = 15 OR byte2 = 15 THEN
+      byteOut1 <= X"46"; -- F
+      byteOut2 <= X"46"; -- F
   END IF;
  
 END PROCESS;
@@ -98,37 +122,37 @@ BEGIN
   FOR i in 0 to 6 LOOP
      Res <= dataResults(i)
      data1 <= to_integer(Res(7 downto 4));
-     data2 <= to_integer(Res(4 downto 0));
+     data2 <= to_integer(Res(3 downto 0));
                 
      IF ((data1 >= 0) OR ((data2 >= 0) AND (data1 <= 9)) OR (data2 <= 9)) THEN
-       L_array(3i) <= '0011' & Res(7 DOWNTO 4);
-       L_array(3i+1) <= '0011' & Res(3 DOWNTO 0);    
+       L_array(3i) <= "0011" & Res(7 DOWNTO 4);
+       L_array(3i+1) <= "0011" & Res(3 DOWNTO 0);    
      
      ELSIF (data1 >= 10) OR ((data2 >= 10) AND (data1 <= 15)) OR ((data2 >= 15) THEN
-      IF data1 = 10`OR data2 = 10 THEN
-        L_array(3i) <= ; X"41" -- A
-        L_array(3i+1) <= ; X"41" -- A
-      ELSIF data1 = 11`OR data2 = 11 THEN
-        L_array(3i) <= ; X"42" -- B
-        L_array(3i+1) <= ; X"42" -- B
-      ELSIF data1 = 12`OR data2 = 12 THEN
-        L_array(3i) <= ; X"43" -- C
-        L_array(3i+1) <= ; X"43" -- C
-      ELSIF data1 = 13`OR data2 = 13 THEN
-        L_array(3i) <= ; X"44" -- D
-        L_array(3i+1) <= ; X"44" -- D
-      ELSIF data1 = 14`OR data2 = 14 THEN
-        L_array(3i) <= ; X"45" -- E
-        L_array(3i+1) <= ; X"45" -- E
-      ELSIF data1 = 15`OR data2 = 14 THEN
-        L_array(3i) <= ; X"46" -- F
-        L_array(3i+1) <= ; X"46" -- F
+      IF data1 = 10 OR data2 = 10 THEN
+        L_array(3i) <= X"41"; -- A
+        L_array(3i+1) <= X"41"; -- A
+      ELSIF data1 = 11 OR data2 = 11 THEN
+        L_array(3i) <= X"42"; -- B
+        L_array(3i+1) <= X"42"; -- B
+      ELSIF data1 = 12 OR data2 = 12 THEN
+        L_array(3i) <= X"43"; -- C
+        L_array(3i+1) <= X"43"; -- C
+      ELSIF data1 = 13 OR data2 = 13 THEN
+        L_array(3i) <= X"44"; -- D
+        L_array(3i+1) <= X"44"; -- D
+      ELSIF data1 = 14 OR data2 = 14 THEN
+        L_array(3i) <= X"45"; -- E
+        L_array(3i+1) <= X"45"; -- E
+      ELSIF data1 = 15 OR data2 = 15 THEN
+        L_array(3i) <= X"46"; -- F
+        L_array(3i+1) <= X"46"; -- F
       END IF;
       END IF;
   END loop;
  
   FOR j in 1 to 7 LOOP
-    L_array((3*j)-1) <= X"20"
+    L_array((3*j)-1) <= X"20";
   END loop;
 END PROCESS;   
  
@@ -174,7 +198,7 @@ BEGIN
     n3 <= data_reg;
   END IF;
      
-  IF n1(7 DOWNTO 4) = '0011' AND n2(7 DOWNTO 4) = '0011' AND n3(7 DOWNTO 4) = '0011' THEN
+  IF n1(7 DOWNTO 4) = "0011" AND n2(7 DOWNTO 4) = "0011" AND n3(7 DOWNTO 4) = "0011" THEN
     num1 <= to_integer(n1(3 DOWNTO 0));
     num2 <= to_integer(n2(3 DOWNTO 0));
     num3 <= to_integer(n3(3 DOWNTO 0));
@@ -208,18 +232,21 @@ BEGIN
     END IF;
   END IF;
 END PROCESS;
+
 -----------------------------------------------------
--- DATA ECHOING PROCESS
-inputEchoing: PROCESS(data_reg, clk, rxNow)
-BEGIN
-  IF rxNow = '1' THEN
-    IF txDone = '1' THEN
-        txNow = '0';
-    ELSIF txDone = '0' THEN
-        txNow = '1';
-    END IF;
-  END IF;
+
+ --P PRINT
+ Peak_print: PROCESS()
+ BEGIN
+   P_array(0)<= L_array(9);
+   P_array(1)<= L_array(10);
+   P_array(2)<= X"20";
+   
+   P_array(3)<= "0011" & maxIndex(0);
+   P_array(4)<= "0011" & maxIndex(1);
+   P_array(5)<= "0011" & maxIndex(2);
 END PROCESS;
+
 -----------------------------------------------------
   -- NEXT STATE LOGIC
   nextStateLogic: PROCESS(curState, data_reg)
@@ -241,12 +268,73 @@ END PROCESS;
  
       WHEN INIT =>
         IF rxNow = '1' THEN
-          nextState <= RECEIVING;
+          nextState <= ECHO;
         ELSIF rxNow = '0' THEN
           nextState <= INIT;
+        END IF;
+     
+      WHEN ECHO =>
+        IF txDone = '1' THEN
+          txNow <= '0';
+          nextState <= ECHO;
+        ELSIF txDone = '0' THEN
+          IF data_reg = X"41" OR data_reg = X"61" THEN -- Detects A or a
+            nextState <= RECEIVING;
+          ELSIF data_reg = X"50" OR data_reg = X"70" THEN -- Detects P or p
+            nextState <= P_CARRIAGE;
+          ELSIF data_reg = X"4C" OR data_reg = X"6C" THEN -- Detects L or l
+            nextState <= L_CARRIAGE;
+          ELSE -- IF NOT P, L, A
+            txData <= data_reg;
+            txNow <= '1';
+            nextState <= INIT;
+          END IF;
+        END IF;
+     
+    WHEN P_CARRIAGE =>
+      IF txDone = '1' THEN
+        txNow <= '0';
+        nextState <= P_CARRIAGE;
+      ELSIF txDone = '0' THEN
+        txData <= X"0D";
+        txNow <= '1';
+        nextState <= P_DASH;
       END IF;
-   
+     
  
+    WHEN L_CARRIAGE =>
+      IF txDone = '1' THEN
+        txNow <= '0';
+      ELSIF txDone = '0' THEN
+        txData <= X"0D";
+        txNow <= '1';
+      END IF;
+      nextState <= L_DASH;
+     
+     
+    WHEN P_DASH =>
+      FOR I IN 0 TO 4 LOOP
+        IF txDone = '1' THEN
+          txNow <= '0';
+          nextState <= P_DASH;
+        ELSIF txDone = '0' THEN
+          txData <= X"3D";
+          txNow <= '1';
+          nextState <= P_PRINT;
+      END LOOP;
+     
+   
+    WHEN L_DASH =>
+      FOR I IN 0 TO 4 LOOP
+        IF txDone = '1' THEN
+          txNow <= '0';
+        ELSIF txDone = '0' THEN
+          txData <= X"3D";
+          txNow <= '1';
+      END LOOP;
+      nextState <= L_PRINT;
+     
+   
       WHEN RECEIVING =>
         IF data_reg = X"41" OR data_reg = X"61" THEN -- Detects A or a
           nextState <= WAIT_NNN;                     -- waits for NNN to be typed to the terminal
@@ -271,36 +359,35 @@ END PROCESS;
      
       WHEN L_PRINT =>
         IF seqDone = '1' THEN
-          FOR i in in 0 to 20 LOOP 
+          FOR i in in 0 to 20 LOOP
             --L_ARRAY HERE?
             IF txDone = '1' THEN
               txNow = '0';
             ELSIF txDone = '0' THEN
-              txData <= L_array(i); 
+              txData <= L_array(i);
               txNow = '1';
             END IF;
           END LOOP;
         ELSE
           nextState <= INIT;
         END IF;
-      
-        
      
       WHEN P_PRINT =>
         IF seqDone = '1' THEN
-          FOR i in in 0 to 5 LOOP 
+          FOR i in 0 to 5 LOOP
             --P_ARRAY HERE?
             IF txDone = '1' THEN
               txNow = '0';
+              nextState <= P_PRINT;
             ELSIF txDone = '0' THEN
-              txData <= P_array(i); 
+              txData <= P_array(i);
               txNow = '1';
+             
             END IF;
           END LOOP;
         ELSE
           nextState <= INIT;
         END IF;
-    
      
       WHEN CHECK_NNN =>
         IF BOOL_N1 = TRUE OR BOOL_N2 = TRUE THEN
@@ -309,11 +396,30 @@ END PROCESS;
           nextState <= INIT;
        
         IF BOOL_N3 = TRUE THEN
-          nextState <= START;
+          nextState <= NEW_LINE;
         ELSE  -- IF N3 IS NOT AN INTEGER
           nextState <= INIT;
+     
+      WHEN NEW_LINE =>
+        IF txDone = '1' THEN
+          txNow <= '0';
+        ELSIF txDone = '0' THEN
+          txData <= X"0D";
+          txNow <= '1';
+        END IF;
+        nextState <= ANNN_DASH;
+     
+      WHEN ANNN_DASH =>
+        FOR I IN 0 TO 4 LOOP
+          IF txDone = '1' THEN
+            txNow <= '0';
+          ELSIF txDone = '0' THEN
+            txData <= X"3D";
+            txNow <= '1';
+        END LOOP;
+        nextState <= S_START;
 
-      WHEN START =>
+      WHEN S_START =>
         start = '1'; -- NOTE: start is initialized as 0 hence should only be HIGH for 1 clk cycle
         nextState <= WAIT_BYTES;
 
@@ -328,7 +434,7 @@ END PROCESS;
         en_dataReadyCount = '1';
         nextState <= TRANSMIT_BYTES;
      
-      WHEN TRANSMIT_BYTES =>
+      WHEN TRANSMIT_BYTES => -- FIX CODE
         IF txDone = '1' THEN
           txNow = '0';
           nextState <= TRANSMIT_BYTES;
@@ -352,66 +458,6 @@ END PROCESS;
   END PROCESS;
  
   -----------------------------------------------------
-
-  -- NEXTSTATE OUTPUT LOGIC
-  ctrlOut: PROCESS(curState, data_reg)
-  BEGIN
-    -- assign default values
-   
-    start  <= '0';
-    rxDone <= '0';
-    --rxnow <= '1'; -- equivalent to 'valid'
-    txNow  <= '0';
-    seqDone <= '0';
-
- 
-    CASE curState IS
-     
-      WHEN INIT =>
-        nextState <= A;
- 
-      WHEN A =>
-        nextState <= ;
-     
-      WHEN L =>
-        nextState <= ;
-     
-      WHEN P =>
-        nextState <= ;
-     
-      WHEN CHECK_NNN =>
- 
- 
-      WHEN ECHO =>
-        nextState <= ;
-
-      WHEN START =>
-        nextState <= ;
-     
-      WHEN PRINT =>
-        nextState <= ;
-     
-      WHEN OTHERS =>
-   
-   
-    END CASE;
-END PROCESS;
-
-
- 
-END; -- ARCHITECHTURE
-
- -----------------------------------------------------
- --P PRINT
- Peak_print: PROCESS()
- BEGIN
-   P_array(0)<= L_array(9);
-   P_array(1)<= L_array(10);
-   P_array(2)<= X"20";
-   
-   P_array(3)<= '0011' & maxIndex(0);
-   P_array(4)<= '0011' & maxIndex(1);
-   P_array(5)<= '0011' & maxIndex(2);
-END PROCESS;
-   
-   
+-- WRITE IMPROVEMENT SECTION ON REPORT:
+-- TO IMPROVE OUR CODE, WE COULD HAVE SEPARATED OUR COMBINATIONAL LOGIC
+-- FROM OUR OUTPUT LOGIC IN A DIFFERENT PROCESS (BECAUSE IT IS GOOD PRACTICE)
