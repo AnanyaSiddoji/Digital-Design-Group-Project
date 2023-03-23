@@ -206,6 +206,7 @@ end process;
 
 ----RequestData--- handshaking protocal here. if rising clock edge then reset and ctrl out register is set to 0 else if state is fetch
 ----ctrl out register <= not ctrl out reg else goes to ctrl out regisiter
+(IDLE,FETCH,WAIT_DATA,DATA_READY,GET_DATA,SEQ_DONE)
 DataRequest: process(clk, reset)
 begin
         if rising_edge(clk) then
@@ -214,21 +215,21 @@ begin
             case currentState is
                 when IDLE =>
                     if ctrlOut = '1' then
-                        currentState <= REQUEST;
+                        currentState <= FETCH;
                         ctrlIn <= '1';
                     else
                         currentState <= IDLE;
                         ctrlIn <= '0';
                     end if;
-                when REQUEST =>
-                    currentState <= WAIT_ctrlOut;
+                when FETCH =>
+                    currentState <= WAIT_DATA;
                     ctrlIn <= '0';
-                when WAIT_ctrlOut =>
+                when WAIT_DATA =>
                     if ctrlOut = '0' then
                         currentState <= IDLE;
                         ctrlIn <= '0';
                     else
-                        currentState <= WAIT_ctrlOut;
+                        currentState <= WAIT_DATA;
                         ctrlIn <= '0';
                     end if;
             end case;
@@ -246,16 +247,18 @@ end process;
 
 ---numWords in integer form--- convert BCD to Integer
 BCD_to_binary: process(numWords_bcd)
+variable sum: std_logic_vector(10 downto 0);
+variable n1, n2: unsigned(10 downto 0);
 begin
         n1 := "0001010" * unsigned(numWords_bcd(1)); -- first BCD digit multiplied by 100
         n2 := "1100100" * unsigned(numWords_bcd(2)); -- second BCD digit multiplied by 10
-        sum := std_logic_vector(unsigned(numWords_bcd(0)) + product1 + product2);
+        sum := std_logic_vector(unsigned(numWords_bcd(0)) + n1 + n2);
         IntegerNumWords <= sum(9 downto 0); 
     end process;   
 
 ---ByteCounter -- if clock is on rising edge and if reset is 1 then reset byte counter else if byte count = number of words reset counter
 ------------------else if the curret state is retreicing data then add one to byte count or wait for new byte (byte count remains same)
-ByteCount: process(clk))
+ByteCount: process(clk)
 begin
 	if rising_edge(clk) AND reset = '1' then
 		byteCount <= 0;
