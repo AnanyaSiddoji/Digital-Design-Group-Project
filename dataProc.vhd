@@ -32,7 +32,7 @@ architecture behav of dataProc is
 	signal dataReg: CHAR_ARRAY_TYPE(0 to 6);
 	signal maxIndexReg: BCD_ARRAY_TYPE(2 downto 0);
 	signal byteReg: CHAR_ARRAY_TYPE(0 to 3);
-	signal ctrlInDelayed, ctrlInDetected, ctrlOutReg,numWordCount,PeakFound,enablePeakCount,ResetPeakCount,resetShifter,resetRegister,loadLeft,loadRight: std_logic;
+	signal ctrlInDelayed, ctrlInDetected, ctrlOutReg,numWordCount,PeakFound,enablePeakCount,ResetPeakCount,resetShifter,resetRegister,loadToLeft,loadToRight: std_logic;
 	signal numWords: BCD_ARRAY_TYPE(2 downto 0);
 	signal IntegerNumWords,bytecount: integer range 0 to 999;
 	signal PeakCount: integer range 0 to 4;
@@ -189,7 +189,7 @@ case currentState IS
 
 end process;
 
---register stateRegister use by storing the input data from the signal generator.                
+             
 StateRegister:	process (clk, reset)
 begin
 		if rising_edge (clk) then
@@ -255,9 +255,32 @@ begin
 
 ---ByteCounter -- if clock is on rising edge and if reset is 1 then reset byte counter else if byte count = number of words reset counter
 ------------------else if the curret state is retreicing data then add one to byte count or wait for new byte (byte count remains same)
+ByteCount: process(clk))
+begin
+	if rising_edge(clk) AND reset = '1' then
+		byteCount <= 0;
+	else 
+		if (byteCount = IntegerNumWords) then
+			byteCount <= 0;
+		elsif currentState = GET_DATA then
+			byteCount <= byteCount + 1;
+		else
+			byteCount <= byteCount;
+		end if;
+	end if;
+end procees;		
 
 
----SequenceComplete - checking if byte number = numebr of words and setting WordCound to 1 if so or 0 if not.
+
+---SequenceFINSIHED - checking if byte number = numebr of words and setting WordCound to 1 if so or 0 if not.
+SequenceFin: process(IntegerNumWords, byteCount)
+begin
+	if (byteCount = IntegerNumWords) then
+		numWordCount <= '1';
+	else 
+		numWordCount <= '0';
+	end if;
+end process;
 --------------------------------------------------------------------------------------------
 --MY PEAK DETECTION PART
 
@@ -289,9 +312,9 @@ if rising_edge(clk) then
     dataReg(i) <= (others => '0');
     end loop;
     else 
-        if loadLeft = '1' then 
+        if loadToLeft = '1' then 
         dataReg(0 to 3) <= byteReg;
-        elsif loadRight ='1' then 
+        elsif loadToRight ='1' then 
             dataReg(4 to 6) <= byteReg(1 to 3);
         elsif reset_register = '1' then 
             for l in 0 to 6 loop
@@ -305,7 +328,7 @@ end process;
 
 SignalOutput: process(reset,PeakFound,PeakCount) 
 begin
-loadRight<='0';
+loadToRight<='0';
     if reset = '1' then 
         enablePeakCount <= '0';
         resetPeakCount <= '0';
@@ -314,7 +337,7 @@ loadRight<='0';
             enablePeakCount <= '1';
          else 
             if PeakCount = 3 then
-                loadRright<='1';
+                loadToRright<='1';
                 enablePeakCount<='0';
              	resetPeakCount<= '1';
             else
@@ -347,11 +370,11 @@ end process;
      
 Comparator: process(byteReg,dataReg,reset) 
 begin
-loadLeft<='0';
+loadToLeft<='0';
 Peakfound <= '0';
 if TO_INTEGER(unsigned(byteReg(3))) > TO_INTEGER(unsigned(dataReg(3))) then 
     Peakfound <= '1';
-    loadLeft<='1';
+    loadToLeft<='1';
 end if;
 end process;
 
