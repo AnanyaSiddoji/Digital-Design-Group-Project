@@ -35,6 +35,7 @@ architecture behav of dataProc is
 	signal numWords: BCD_ARRAY_TYPE(2 downto 0);
 	signal IntegerNumWords,bytecount: integer range 0 to 999;
 	signal PeakCount: integer range 0 to 4;
+	signal signal_ctrlIn, signal_ctrlOut :std_logic;
 
 	--signal maxData		: std_logic_vector(7 downto 0):=(others=>'0');
 	--signal dataResult_buffer_register : std_logic_vector (55 downto 0):=(others => '0');
@@ -206,31 +207,30 @@ end process;
 
 ----RequestData--- handshaking protocal here. if rising clock edge then reset and ctrl out register is set to 0 else if state is fetch
 ----ctrl out register <= not ctrl out reg else goes to ctrl out regisiter
-(IDLE,FETCH,WAIT_DATA,DATA_READY,GET_DATA,SEQ_DONE)
 DataRequest: process(clk, reset)
 begin
         if rising_edge(clk) then
-            currentState <= IDLE;
-            ctrlIn <= '0';
+		signal_ctrlIn <= ctrlIn;
+		--signal_ctrlOut <= ctrlOut;
             case currentState is
                 when IDLE =>
-                    if ctrlOut = '1' then
+                    if signal_ctrlOut = '1' then
                         currentState <= FETCH;
-                        ctrlIn <= '1';
+                        signal_ctrlIn <= '1';
                     else
                         currentState <= IDLE;
-                        ctrlIn <= '0';
+                        signal_ctrlIn <= '0';
                     end if;
                 when FETCH =>
                     currentState <= WAIT_DATA;
-                    ctrlIn <= '0';
+                    signal_ctrlIn <= '0';
                 when WAIT_DATA =>
-                    if ctrlOut = '0' then
+                    if signal_ctrlOut = '0' then
                         currentState <= IDLE;
-                        ctrlIn <= '0';
+                        signal_ctrlIn <= '0';
                     else
                         currentState <= WAIT_DATA;
-                        ctrlIn <= '0';
+                        signal_ctrlIn <= '0';
                     end if;
             end case;
         end if;
