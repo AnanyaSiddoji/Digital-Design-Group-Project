@@ -37,12 +37,6 @@ architecture behav of dataConsume is
 	signal PeakCount: integer range 0 to 4;
 	signal signal_ctrlIn, signal_ctrlOut :std_logic;
 
-	--signal maxData		: std_logic_vector(7 downto 0):=(others=>'0');
-	--signal dataResult_buffer_register : std_logic_vector (55 downto 0):=(others => '0');
-	--signal dataResult 	: std_logic_vector (55 downto 0):=(others => '0');
-	--signal BCD_counter, max_index                   : BCD_ARRAY_TYPE(2 downto 0):=(others=>(others=>'0'));
-  	--SIGNAL BCD_cnt1, BCD_cnt2, BCD_cnt3, BCD_cnt4  : BCD_ARRAY_TYPE(2 downto 0):=(others=>(others=>'0'));
-  	--SIGNAL countUp   : std_logic :='0';
 
 --------------------------------------------------------------------------------------------------------
 --begin 
@@ -88,15 +82,6 @@ architecture behav of dataConsume is
 
 --end process;
 ------------------------------------------------------------------
---seq_state: process (clk, reset)
---begin
---	if reset = '1' then
---		curState <= s0;
---	elsif clk'EVENT AND clk='1' then
---		curState <= nextState;
---	end if;
---end process; -- ends seq process
-------------------------------------------------------------------
 --buffer_reg: process (clk, reset) -- i was about to implement buffer register beforehand
 --begin
 --	if reset = '1' then
@@ -107,7 +92,6 @@ architecture behav of dataConsume is
 --end process;	
 
 -------------------------------------------------------------------
-
 --dataReg: process (clk, reset)
 --begin
 --	if reset = '1' then
@@ -285,9 +269,7 @@ begin
 			byteCount <= byteCount;
 		end if;
 	end if;
-end process;		
-
-
+end process;
 
 ---SequenceFINSIHED - checking if byte number = numebr of words and setting WordCound to 1 if so or 0 if not.
 SequenceFin: process(IntegerNumWords, byteCount)
@@ -413,9 +395,6 @@ if rising_edge(clk) then
  end if;
 end process;
        
-
-
-
   
 --High of CtrlIn changes
 ctrlInDetected <= ctrlIn xor ctrlInDelayed;
@@ -424,4 +403,4 @@ ctrlOut <= ctrlOutReg;
 --Sends input to be converted to integer
 numWords<=numWords_Bcd;
 
-end Behav;
+end behav;
