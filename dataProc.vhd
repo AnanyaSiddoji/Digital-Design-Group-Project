@@ -1,13 +1,12 @@
 LIBRARY ieee;
-USE ieee.std_logic_1164.ALL;
-USE ieee.std_logic_unsigned.ALL;
+USE IEEE.std_logic_1164.ALL;
+USE IEEE.std_logic_unsigned.ALL;
 USE work.common_pack.ALL;
-USE ieee.numeric_std.ALL;
+USE IEEE.numeric_std.ALL;
 -- Uncomment the following library declaration if instantiating
 -- any Xilinx leaf cells in this code.
 --library UNISIM;
 --use UNISIM.VComponents.all;
-
 ------------------------------------------------------
 ENTITY dataProc is
 Port (
@@ -118,6 +117,7 @@ architecture behav of dataProc is
 --end process;	
 
 ---STATES-------------------------------------------------------------------------------
+begin
 StateChange: process(currentState,start,ctrlInDetected,numWordCount) 
 begin
 resetShifter<='0';
@@ -206,29 +206,29 @@ end process;
 
 ----RequestData--- handshaking protocal here. if rising clock edge then reset and ctrl out register is set to 0 else if state is fetch
 ----ctrl out register <= not ctrl out reg else goes to ctrl out regisiter
-DataRequest: process(clk, rst)
+DataRequest: process(clk, reset)
 begin
         if rising_edge(clk) then
-            state <= IDLE;
+            currentState <= IDLE;
             ctrlIn <= '0';
-            case state is
+            case currentState is
                 when IDLE =>
                     if ctrlOut = '1' then
-                        state <= REQUEST;
+                        currentState <= REQUEST;
                         ctrlIn <= '1';
                     else
-                        state <= IDLE;
+                        currentState <= IDLE;
                         ctrlIn <= '0';
                     end if;
                 when REQUEST =>
-                    state <= WAIT_ctrlOut;
+                    currentState <= WAIT_ctrlOut;
                     ctrlIn <= '0';
                 when WAIT_ctrlOut =>
                     if ctrlOut = '0' then
-                        state <= IDLE;
+                        currentState <= IDLE;
                         ctrlIn <= '0';
                     else
-                        state <= WAIT_ctrlOut;
+                        currentState <= WAIT_ctrlOut;
                         ctrlIn <= '0';
                     end if;
             end case;
