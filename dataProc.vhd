@@ -15,9 +15,9 @@ Port (
 	reset:	in std_logic; -- synchronous reset
 	start:	in std_logic; -- goes high to signal data transfer
 	numWords_bcd	:in BCD_ARRAY_TYPE(2 downto 0);
-  	ctrl2:   	in std_logic;
-  	ctrl1:		out std_logic;
-  	data_in:	in std_logic_vector(7 downto 0);
+  	ctrlIn: in std_logic;
+  	ctrlOut: out std_logic;
+ 	data: in std_logic_vector(7 downto 0);
   	dataReady:   	out std_logic;
   	byte:	        out std_logic_vector(7 downto 0);
   	seqDone:     	out std_logic;
@@ -206,45 +206,51 @@ end process;
 
 ----RequestData--- handshaking protocal here. if rising clock edge then reset and ctrl out register is set to 0 else if state is fetch
 ----ctrl out register <= not ctrl out reg else goes to ctrl out regisiter
-ataRequest: process(clk, rst)
+DataRequest: process(clk, rst)
 begin
         if rising_edge(clk) then
             state <= IDLE;
-            ctrl1 <= '0';
+            ctrlIn <= '0';
             case state is
                 when IDLE =>
-                    if ctrl2 = '1' then
+                    if ctrlOut = '1' then
                         state <= REQUEST;
-                        ctrl1 <= '1';
+                        ctrlIn <= '1';
                     else
                         state <= IDLE;
-                        ctrl1 <= '0';
+                        ctrlIn <= '0';
                     end if;
                 when REQUEST =>
-                    state <= WAIT_ctrl2;
-                    ctrl1 <= '0';
-                when WAIT_ctrl2 =>
-                    if ctrl2 = '0' then
+                    state <= WAIT_ctrlOut;
+                    ctrlIn <= '0';
+                when WAIT_ctrlOut =>
+                    if ctrlOut = '0' then
                         state <= IDLE;
-                        ctrl1 <= '0';
+                        ctrlIn <= '0';
                     else
-                        state <= WAIT_ctrl2;
-                        ctrl1 <= '0';
+                        state <= WAIT_ctrlOut;
+                        ctrlIn <= '0';
                     end if;
             end case;
         end if;
     end process;
 
 ---Delay CtrlIn -- if clock is no rising edge then ctrlInDelayed <= ctrlIn
+ctrlInDelayed: process(clk)
+begin
+	if rising_edge(clock) then
+		ctrlInDelayed <= ctrIn;
+	end if;
+end process;
 
 
----numWordsToInteger--- convert BCD to Integer
+---numWords in integer form--- convert BCD to Integer
 BCD_to_binary: process(numWords_bcd)
 begin
         n1 := "0001010" * unsigned(numWords_bcd(1)); -- first BCD digit multiplied by 100
         n2 := "1100100" * unsigned(numWords_bcd(2)); -- second BCD digit multiplied by 10
         sum := std_logic_vector(unsigned(numWords_bcd(0)) + product1 + product2);
-        numWords_bin <= sum(9 downto 0); 
+        IntegerNumWords <= sum(9 downto 0); 
     end process;   
 
 ---ByteCounter -- if clock is on rising edge and if reset is 1 then reset byte counter else if byte count = number of words reset counter
