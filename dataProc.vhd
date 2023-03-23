@@ -27,7 +27,7 @@ Port (
 end;
 ---------------------------------------------------------
 architecture behav of dataProc is
-	type state_type is (IDLE,FETCH,WAIT_DATA,DATA_READY,RECIEVE_DATA,SEQ_DONE);
+	type state_type is (IDLE,FETCH,WAIT_DATA,DATA_READY,GET_DATA,SEQ_DONE);
 	signal currentstate,nextstate : state_type;
 	signal dataReg: CHAR_ARRAY_TYPE(0 to 6);
 	signal maxIndexReg: BCD_ARRAY_TYPE(2 downto 0);
@@ -45,86 +45,84 @@ architecture behav of dataProc is
   	--SIGNAL countUp   : std_logic :='0';
 
 --------------------------------------------------------------------------------------------------------
-begin 
-nextState: Process(clk) --this is draft
-begin
-	if rising_edge(clk) then 
-		if reset = '1' then
-			ctrlOut <= '0' then
-			state <= s0;
-		else
-			
-	case curState is 
-		when s0 =>
-			if start = '1' then
-				nextState <= s1;
-			else
-				nextState <= s0;
-			end if;
-		when s1 =>
-			if ctrl1 = '1' then
-				nextState <= s2;
-			else
-				nextState <= s1;		
-			end if;
-		when s2 =>
-			ctrl1 <= '0';
-			if ctrl2 = '1' then
-				nextState <= s3;
-			else
-				nextState <= s2;
-			end if;		
-		when s3 =>
-			if counter = numWords then
-				nextState <= s4;
-			elsif counter < numWords 
-				nextState <= s0;
-			else 
-				err;
-			end if;			
-		when s4 =>
-			seqDone = '1';
-			 
+--begin 
+--nextState: Process(clk) --this is draft
+--begin
+--	if rising_edge(clk) then 
+--		if reset = '1' then
+--			ctrlOut <= '0' then
+--			state <= s0;
+--		else
+--			
+--	case curState is 
+--		when s0 =>
+--			if start = '1' then
+--				nextState <= s1;
+--			else
+--				nextState <= s0;
+--			end if;
+--		when s1 =>
+--			if ctrl1 = '1' then
+--				nextState <= s2;
+--			else
+--				nextState <= s1;		
+--			end if;
+--		when s2 =>
+--			ctrl1 <= '0';
+--			if ctrl2 = '1' then
+--				nextState <= s3;
+--			else
+--				nextState <= s2;
+--			end if;		
+--		when s3 =>
+--			if counter = numWords then
+--				nextState <= s4;
+--			elsif counter < numWords 
+--				nextState <= s0;
+--			else 
+--				err;
+--			end if;			
+--		when s4 =>
+--			seqDone = '1';
+--			 
 
-end process;
+--end process;
 ------------------------------------------------------------------
-seq_state: process (clk, reset)
-begin
-	if reset = '1' then
-		curState <= s0;
-	elsif clk'EVENT AND clk='1' then
-		curState <= nextState;
-	end if;
-end process; -- ends seq process
+--seq_state: process (clk, reset)
+--begin
+--	if reset = '1' then
+--		curState <= s0;
+--	elsif clk'EVENT AND clk='1' then
+--		curState <= nextState;
+--	end if;
+--end process; -- ends seq process
 ------------------------------------------------------------------
-buffer_reg: process (clk, reset) -- i was about to implement buffer register beforehand
-begin
-	if reset = '1' then
-		dataResult_buffer_register <= (others => '0');
-	elsif rising_edge(clk) then 
-		dataResult_buffer_register(2 downto 0) <= "00000000";
-	end if;
-end process;	
+--buffer_reg: process (clk, reset) -- i was about to implement buffer register beforehand
+--begin
+--	if reset = '1' then
+--		dataResult_buffer_register <= (others => '0');
+--	elsif rising_edge(clk) then 
+--		dataResult_buffer_register(2 downto 0) <= "00000000";
+--	end if;
+--end process;	
 
 -------------------------------------------------------------------
 
-dataReg: process (clk, reset)
-begin
-	if reset = '1' then
-		dataResult  <= (others => '0');
-	elsif rising_edge(clk) then 
-		dataResult_buffer_register(2 downto 0) <= "00000000";
-	end if;
-end process;	
+--dataReg: process (clk, reset)
+--begin
+--	if reset = '1' then
+--		dataResult  <= (others => '0');
+--	elsif rising_edge(clk) then 
+--		dataResult_buffer_register(2 downto 0) <= "00000000";
+--	end if;
+--end process;	
 
-
-
---------------- PEAK DETECTION PART
+---STATES-------------------------------------------------------------------------------
 StateChange: process(currentState,start,ctrlInDetected,numWordCount) 
 begin
 resetShifter<='0';
 resetRegister<='0';
-	 -- assign defaults at the beginning to avoid assigning in every branch
+	 -- assign as default
     case currentState is
         
         when IDLE => 
@@ -137,7 +135,7 @@ resetRegister<='0';
             end if;            
             
         
-        when RECIEVE_DATA =>
+        when GET_DATA =>
             nextState <= DATA_READY;
 
 	when FETCH =>
@@ -145,7 +143,7 @@ resetRegister<='0';
         
         when WAIT_DATA => 
             if ctrlInDetected <= '1' then
-                nextState <= RECIEVE_DATA;
+                nextState <= GET_DATA;
             else 
             --Wait for change in CtrlIn
                 nextState <= WAIT_DATA;
@@ -265,7 +263,7 @@ if rising_edge(clk) then
     byteReg(j) <= (others => '0');
     end loop;
     else 
-        if currentState = RECIEVE_DATA then
+        if currentState = GET_DATA then
              byteReg <= byteReg(1 to 3) & data;
         elsif resetShifter = '1' then 
             for k in 0 to 3 loop
@@ -331,7 +329,7 @@ if rising_edge(clk) then
             peakCount<=0;
         else
             if enablePeakCount = '1' then 
-                if currentState = RECIEVE_DATA then 
+                if currentState = GET_DATA then 
                     PeakCount<=PeakCount+1;
                 end if;
         end if;
