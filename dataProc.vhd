@@ -12,10 +12,9 @@ USE ieee.numeric_std.ALL;
 ENTITY dataProc is
 Port (
 	clk:	in std_logic;
-	reset:	in std_logic;
-	start:	in std_logic;
+	reset:	in std_logic; -- synchronous reset
+	start:	in std_logic; -- goes high to signal data transfer
 	numWords_bcd	:in BCD_ARRAY_TYPE(2 downto 0);
-	numWords_dec	:out integer (999999 downto 0);
   	ctrl2:   	in std_logic;
   	ctrl1:		out std_logic;
   	data_in:	in std_logic_vector(7 downto 0);
@@ -28,31 +27,26 @@ Port (
 end;
 ---------------------------------------------------------
 architecture behav of dataProc is
-	Type state_type is (s0, s1, s2, s3, s4);
-	signal curState, nextState: state_type:= s0;
-	signal load 		: std_logic := '0';
-	signal maxData		: std_logic_vector(7 downto 0):=(others=>'0');
-	signal dataResult_buffer_register : std_logic_vector (55 downto 0):=(others => '0');
-	signal dataResult 	: std_logic_vector (55 downto 0):=(others => '0');
-	signal BCD_counter, max_index                   : BCD_ARRAY_TYPE(2 downto 0):=(others=>(others=>'0'));
-  	SIGNAL BCD_cnt1, BCD_cnt2, BCD_cnt3, BCD_cnt4  : BCD_ARRAY_TYPE(2 downto 0):=(others=>(others=>'0'));
-  	SIGNAL countUp   : std_logic :='0';
+	type state_type is (IDLE,FETCH,WAIT_DATA,DATA_READY,RECIEVE_DATA,SEQ_DONE);
+	signal currentstate,nextstate : state_type;
+	signal dataReg: CHAR_ARRAY_TYPE(0 to 6);
+	signal maxIndexReg: BCD_ARRAY_TYPE(2 downto 0);
+	signal byteReg: CHAR_ARRAY_TYPE(0 to 3);
+	signal ctrlInDelayed, ctrlInDetected, ctrlOutReg,numWordCount,PeakFound,enablePeakCount,ResetPeakCount,resetShifter,resetRegister,loadLeft,loadRight: std_logic;
+	signal numWords: BCD_ARRAY_TYPE(2 downto 0);
+	signal IntegerNumWords,bytecount: integer range 0 to 999;
+	signal PeakCount: integer range 0 to 4;
 
-
---type state_type is (IDLE,FETCH,WAIT_DATA,DATA_READY,RECIEVE_DATA,SEQ_DONE);
-signal dataReg: CHAR_ARRAY_TYPE(0 to 6);
-signal maxIndexReg: BCD_ARRAY_TYPE(2 downto 0);
-signal byteReg: CHAR_ARRAY_TYPE(0 to 3);
-signal ctrlInDelayed, ctrlInDetected, ctrlOutReg,numWordCount,PeakFound,enablePeakCount,ResetPeakCount,resetShifter,resetRegister,loadLeft,loadRight: std_logic;
---signal numWords: BCD_ARRAY_TYPE(2 downto 0);
-signal IntegerNumWords,bytecount: integer range 0 to 999;
-signal PeakCount: integer range 0 to 4;
-begin
+	--signal maxData		: std_logic_vector(7 downto 0):=(others=>'0');
+	--signal dataResult_buffer_register : std_logic_vector (55 downto 0):=(others => '0');
+	--signal dataResult 	: std_logic_vector (55 downto 0):=(others => '0');
+	--signal BCD_counter, max_index                   : BCD_ARRAY_TYPE(2 downto 0):=(others=>(others=>'0'));
+  	--SIGNAL BCD_cnt1, BCD_cnt2, BCD_cnt3, BCD_cnt4  : BCD_ARRAY_TYPE(2 downto 0):=(others=>(others=>'0'));
+  	--SIGNAL countUp   : std_logic :='0';
 
 --------------------------------------------------------------------------------------------------------
-	-- 	
 begin 
-nextState: Process(clk)
+nextState: Process(clk) --this is draft
 begin
 	if rising_edge(clk) then 
 		if reset = '1' then
@@ -103,7 +97,7 @@ begin
 	end if;
 end process; -- ends seq process
 ------------------------------------------------------------------
-buffer_reg: process (clk, reset)
+buffer_reg: process (clk, reset) -- i was about to implement buffer register beforehand
 begin
 	if reset = '1' then
 		dataResult_buffer_register <= (others => '0');
@@ -214,64 +208,34 @@ end process;
 
 ----RequestData--- handshaking protocal here. if rising clock edge then reset and ctrl out register is set to 0 else if state is fetch
 ----ctrl out register <= not ctrl out reg else goes to ctrl out regisiter
-dataRequest: process(clk, reset)
-begin	
-	if rising_edge (clk) then
-		case state is
-			when IDLE =>
-				if start = '1' then -- send request signal
-					ctrl1 <= '1';
-					state
-
-
-process(clk)
+ataRequest: process(clk, rst)
 begin
-    if rising_edge(clk) then
-        case state is
-            when IDLE =>
-                if request = '1' then
-                    -- Send request signal to the data source
-                    req <= '1';
-                    state <= REQUEST_SENT;
-                end if;
-
-            when REQUEST_SENT =>
-                -- Wait for the acknowledge signal from the data source
-                if ack = '1' then
-                    -- Acknowledge signal received, send data request signal
-                    req <= '0';
-                    data_req <= '1';
-                    state <= DATA_REQUEST_SENT;
-                elsif timeout = '1' then
-                    -- Timeout, go back to idle state and reset request signal
-                    req <= '0';
-                    state <= IDLE;
-                end if;
-
-            when DATA_REQUEST_SENT =>
-                -- Wait for the acknowledge signal from the data source
-                if ack = '1' then
-                    -- Acknowledge signal received, data is ready to be read
-                    data_req <= '0';
-                    state <= DATA_READY;
-                elsif timeout = '1' then
-                    -- Timeout, go back to idle state and reset request and data request signals
-                    req <= '0';
-                    data_req <= '0';
-                    state <= IDLE;
-                end if;
-
-            when DATA_READY =>
-                -- Read the data from the data source and store it in a buffer
-                buffer <= data_in;
-                -- Go back to idle state and reset request and data request signals
-                req <= '0';
-                data_req <= '0';
-                state <= IDLE;
-        end case;
-    end if;
-end process;
-
+        if rising_edge(clk) then
+            state <= IDLE;
+            ctrl1 <= '0';
+            case state is
+                when IDLE =>
+                    if ctrl2 = '1' then
+                        state <= REQUEST;
+                        ctrl1 <= '1';
+                    else
+                        state <= IDLE;
+                        ctrl1 <= '0';
+                    end if;
+                when REQUEST =>
+                    state <= WAIT_ctrl2;
+                    ctrl1 <= '0';
+                when WAIT_ctrl2 =>
+                    if ctrl2 = '0' then
+                        state <= IDLE;
+                        ctrl1 <= '0';
+                    else
+                        state <= WAIT_ctrl2;
+                        ctrl1 <= '0';
+                    end if;
+            end case;
+        end if;
+    end process;
 
 ---Delay CtrlIn -- if clock is no rising edge then ctrlInDelayed <= ctrlIn
 
@@ -279,18 +243,12 @@ end process;
 ---numWordsToInteger--- convert BCD to Integer
 BCD_to_binary: process(numWords_bcd)
 begin
+        n1 := "0001010" * unsigned(numWords_bcd(1)); -- first BCD digit multiplied by 100
+        n2 := "1100100" * unsigned(numWords_bcd(2)); -- second BCD digit multiplied by 10
+        sum := std_logic_vector(unsigned(numWords_bcd(0)) + product1 + product2);
+        numWords_bin <= sum(9 downto 0); 
+    end process;   
 
-	decimal_out <= to_integer(unsigned(resize(numWords_bcd(23 downto 16), 32))) * 10000
-                     + to_integer(unsigned(resize(numWords_bcd(15 downto 8), 32))) * 100
-                     + to_integer(unsigned(resize(numWords_bcd(7 downto 0), 32)));
-
-	MaxIndexReg(2) <= std_logic_vector(TO_UNSIGNED(((byteCount-1)/100),4));
-	MaxIndexReg(1) <= std_logic_vector(TO_UNSIGNED((((byteCount-1) mod 100)/10),4));
-	MaxIndexReg(0) <= std_logic_vector(TO_UNSIGNED(((byteCount-1) mod 10),4));
-
-
-
-end process;
 ---ByteCounter -- if clock is on rising edge and if reset is 1 then reset byte counter else if byte count = number of words reset counter
 ------------------else if the curret state is retreicing data then add one to byte count or wait for new byte (byte count remains same)
 
