@@ -209,32 +209,44 @@ end process;
 ----ctrl out register <= not ctrl out reg else goes to ctrl out regisiter
 DataRequest: process(clk, reset)
 begin
-        if rising_edge(clk) then
-		signal_ctrlIn <= ctrlIn;
-		--signal_ctrlOut <= ctrlOut;
-            case currentState is
-                when IDLE =>
-                    if signal_ctrlOut = '1' then
-                        currentState <= FETCH;
-                        signal_ctrlIn <= '1';
-                    else
-                        currentState <= IDLE;
-                        signal_ctrlIn <= '0';
-                    end if;
-                when FETCH =>
-                    currentState <= WAIT_DATA;
-                    signal_ctrlIn <= '0';
-                when WAIT_DATA =>
-                    if signal_ctrlOut = '0' then
-                        currentState <= IDLE;
-                        signal_ctrlIn <= '0';
-                    else
-                        currentState <= WAIT_DATA;
-                        signal_ctrlIn <= '0';
-                    end if;
-            end case;
-        end if;
-    end process;
+    if rising_edge(clk) then
+        if reset='1' then
+            ctrlOutReg <= '0';
+        else
+            if currentState = FETCH then
+                ctrlOutReg <= not ctrlOutReg;
+            else 
+                ctrlOutReg <= ctrlOutReg;
+            end if;
+         end if;
+     end if;
+end process;
+--        if rising_edge(clk) then
+--		signal_ctrlIn <= ctrlIn;
+--		--signal_ctrlOut <= ctrlOut;
+--            case currentState is
+ --               when IDLE =>
+--                    if signal_ctrlOut = '1' then
+--                        currentState <= FETCH;
+--                        signal_ctrlIn <= '1';
+--                    else
+--                        currentState <= IDLE;
+--                        signal_ctrlIn <= '0';
+--                    end if;
+--                when FETCH =>
+--                    currentState <= WAIT_DATA;
+--                    signal_ctrlIn <= '0';
+ --               when WAIT_DATA =>
+--                    if signal_ctrlOut = '0' then
+--                        currentState <= IDLE;
+--                        signal_ctrlIn <= '0';
+ --                   else
+--                        currentState <= WAIT_DATA;
+--                        signal_ctrlIn <= '0';
+--                    end if;
+--            end case;
+ --       end if;
+ --   end process;
 
 ---Delay CtrlIn -- if clock is no rising edge then ctrlInDelayed <= ctrlIn
 ctrlInDelay: process(clk)
