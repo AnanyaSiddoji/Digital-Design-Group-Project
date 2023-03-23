@@ -8,7 +8,7 @@ USE IEEE.numeric_std.ALL;
 --library UNISIM;
 --use UNISIM.VComponents.all;
 ------------------------------------------------------
-ENTITY dataProc is
+ENTITY dataConsume is
 Port (
 	clk:	in std_logic;
 	reset:	in std_logic; -- synchronous reset
@@ -25,7 +25,7 @@ Port (
 );
 end;
 ---------------------------------------------------------
-architecture behav of dataProc is
+architecture behav of dataConsume is
 	type state_type is (IDLE,FETCH,WAIT_DATA,DATA_READY,GET_DATA,SEQ_DONE);
 	signal currentstate,nextstate : state_type;
 	signal dataReg: CHAR_ARRAY_TYPE(0 to 6);
@@ -237,10 +237,10 @@ begin
     end process;
 
 ---Delay CtrlIn -- if clock is no rising edge then ctrlInDelayed <= ctrlIn
-ctrlInDelayed: process(clk)
+ctrlInDelay: process(clk)
 begin
-	if rising_edge(clock) then
-		ctrlInDelayed <= ctrIn;
+	if rising_edge(clk) then
+		ctrlInDelayed <= ctrlIn;
 	end if;
 end process;
 
@@ -250,15 +250,17 @@ BCD_to_binary: process(numWords_bcd)
 variable sum: std_logic_vector(10 downto 0);
 variable n1, n2: unsigned(10 downto 0);
 begin
-        n1 := "0001010" * unsigned(numWords_bcd(1)); -- first BCD digit multiplied by 100
-        n2 := "1100100" * unsigned(numWords_bcd(2)); -- second BCD digit multiplied by 10
-        sum := std_logic_vector(unsigned(numWords_bcd(0)) + n1 + n2);
-        IntegerNumWords <= sum(9 downto 0); 
+        --n1 := "0001010" * unsigned(numWords_bcd(1)); -- first BCD digit multiplied by 100
+        --n2 := "1100100" * unsigned(numWords_bcd(2)); -- second BCD digit multiplied by 10
+        --sum := std_logic_vector(unsigned(numWords_bcd(0)) + n1 + n2);
+        --IntegerNumWords <= sum(9 downto 0); 
+
+        IntegerNumWords<= 100*TO_INTEGER (unsigned(numwords(2)))+10*TO_INTEGER(unsigned(numwords(1)))+TO_INTEGER(unsigned(numWords(0)));
     end process;   
 
 ---ByteCounter -- if clock is on rising edge and if reset is 1 then reset byte counter else if byte count = number of words reset counter
 ------------------else if the curret state is retreicing data then add one to byte count or wait for new byte (byte count remains same)
-ByteCount: process(clk)
+ByteCounter: process(clk)
 begin
 	if rising_edge(clk) AND reset = '1' then
 		byteCount <= 0;
@@ -271,7 +273,7 @@ begin
 			byteCount <= byteCount;
 		end if;
 	end if;
-end procees;		
+end process;		
 
 
 
@@ -319,7 +321,7 @@ if rising_edge(clk) then
         dataReg(0 to 3) <= byteReg;
         elsif loadToRight ='1' then 
             dataReg(4 to 6) <= byteReg(1 to 3);
-        elsif reset_register = '1' then 
+        elsif resetRegister = '1' then 
             for l in 0 to 6 loop
             dataReg(l) <= (others => '0');
             end loop;
@@ -340,7 +342,7 @@ loadToRight<='0';
             enablePeakCount <= '1';
          else 
             if PeakCount = 3 then
-                loadToRright<='1';
+                loadToRight <='1';
                 enablePeakCount<='0';
              	resetPeakCount<= '1';
             else
@@ -408,6 +410,6 @@ ctrlInDetected <= ctrlIn xor ctrlInDelayed;
 --Output to dataGen
 ctrlOut <= ctrlOutReg;
 --Sends input to be converted to integer
-numWords<=numWordsBcd;
+numWords<=numWords_Bcd;
 
-end Behavioral;	
+end Behav;
