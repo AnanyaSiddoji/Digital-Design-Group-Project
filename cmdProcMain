@@ -66,6 +66,7 @@ ARCHITECTURE command OF cmdProc IS
  -- PROCESS dataRes_to_Hex
  SIGNAL Res: std_logic_vector(7 DOWNTO 0);
  SIGNAL data1, data2: integer range 0 to 15;
+ SIGNAL asc, asc2, byteAlpha_1, byteAlpha_2 : integer range 0 to 127;
  
  -- PROCESS NNN_CHECK
  SIGNAL n1, n2, n3: std_logic_vector(7 DOWNTO 0);
@@ -141,97 +142,51 @@ END PROCESS;
 -- CONVERSIONS
 byteToHex: PROCESS(byte, byte1, byte2)
 BEGIN
- 
-  IF ((byte1 >= 0) AND (byte1 <= 9)) OR ((byte2 >= 0) AND (byte2 <= 9)) THEN
-    byteOut1 <= "0011" & byte(7 DOWNTO 4);
-    byteOut2 <= "0011" & byte(3 DOWNTO 0);
 
-  ELSIF ((byte1 >= 10) AND (byte1 <= 15)) OR ((byte2 >= 10) AND (byte2 <= 15)) THEN
-    IF byte1 = 10 THEN
-      byteOut1 <= X"41"; -- A
-    ELSIF byte2 = 10 THEN
-      byteOut2 <= X"41"; -- A
-
-    ELSIF byte1 = 11 THEN
-      byteOut1 <= X"42"; -- B
-    ELSIF byte2 = 11 THEN
-      byteOut2 <= X"42"; -- B
-
-    ELSIF byte1 = 12 THEN  
-      byteOut1 <= X"43"; -- C
-    ELSIF byte2 = 12 THEN
-      byteOut2 <= X"43"; -- C
-
-    ELSIF byte1 = 13 THEN
-      byteOut1 <= X"44"; -- D
-    ELSIF byte2 = 13 THEN
-      byteOut2 <= X"44"; -- D
-
-    ELSIF byte1 = 14 THEN
-      byteOut1 <= X"45"; -- E
-    ELSIF byte2 = 14 THEN
-      byteOut2 <= X"45"; -- E
-
-    ELSIF byte1 = 15 THEN  
-      byteOut1 <= X"46"; -- F
-    ELSIF byte2 = 15 THEN
-      byteOut2 <= X"46"; -- F
-    END IF;
+  IF (byte1 >= 0) AND (byte1 <= 9) THEN
+    asc <= byte1 + 48;
+    byteOut1 <= std_logic_vector(to_unsigned(asc,8));
+  ELSIF (byte1 >= 10) AND (byte1 <= 15) THEN
+    asc <= byte1 + 55;
+    byteOut1 <= std_logic_vector(to_unsigned(asc,8));
   ELSE
-    byteOut1 <= X"00"; -- NULL
-    byteOut2 <= X"00"; -- NULL
+    byteOut1 <= X"00";  --NULL
   END IF;
- 
+
+  IF (byte2 >= 0) AND (byte2 <= 9) THEN
+    asc2 <= byte2 + 48;
+    byteOut2 <= std_logic_vector(to_unsigned(asc2,8));
+  ELSIF (byte2 >= 10) AND (byte2 <= 15) THEN
+    asc2 <= byte2 + 55;
+    byteOut2 <= std_logic_vector(to_unsigned(asc2,8));
+  ELSE
+    byteOut2 <= X"00";  --NULL
+  END IF;
+  
+  
 END PROCESS;
 
 -----------------------------------------------------
 -- ASCII input from DP to hex output to Tx
 dataRes_to_Hex: PROCESS(dataResults, lCounter, Res, data1, data2) -- CHECK SENSITIVITY LIST !!!
-BEGIN    
-  IF lCounter /= 0 THEN
-    L_array((3*lCounter)-1) <= X"20";
+BEGIN 
+  
+  IF lCounter > 0 THEN
+    L_array(3*lCounter-1) <= X"20";
   END IF;
- 
-  IF ((data1 >= 0) AND (data1 <= 9)) OR ((data2 >= 0) AND (data2 <= 9)) THEN
-    L_array(3*lCounter) <= "0011" & Res(7 DOWNTO 4);
-    L_array(3*lCounter+1) <= "0011" & Res(3 DOWNTO 0);
- 
-  ELSIF ((data1 >= 10) AND (data1 <= 15)) OR ((data2 >= 10) AND (data2 <= 15)) THEN
-    IF data1 = 10 THEN
-      L_array(3*lCounter) <= X"41"; -- A
-    ELSIF data2 = 10 THEN
-      L_array(3*lCounter+1) <= X"41"; -- A
-     
-    ELSIF data1 = 11 THEN
-      L_array(3*lCounter) <= X"42"; -- B
-    ELSIF data2 = 11 THEN
-      L_array(3*lCounter+1) <= X"42"; -- B
-     
-    ELSIF data1 = 12 THEN  
-      L_array(3*lCounter) <= X"43"; -- C
-    ELSIF data2 = 12 THEN
-      L_array(3*lCounter+1) <= X"43"; -- C
-     
-    ELSIF data1 = 13 THEN
-      L_array(3*lCounter) <= X"44"; -- D
-    ELSIF data2 = 13 THEN
-      L_array(3*lCounter+1) <= X"44"; -- D
-     
-    ELSIF data1 = 14 THEN
-      L_array(3*lCounter) <= X"45"; -- E
-    ELSIF data2 = 14 THEN
-      L_array(3*lCounter+1) <= X"45"; -- E
-   
-    ELSIF data1 = 15 THEN
-      L_array(3*lCounter) <= X"46"; -- F
-    ELSIF data2 = 15 THEN
-      L_array(3*lCounter+1) <= X"46"; -- F
-   
-    END IF;
+  
+  IF (data1 >= 0) AND (data1 <= 9) THEN
+    L_array(3*lCounter) <= std_logic_vector(to_unsigned(data1 + 48,8));
+  ELSIF (data1 >= 10) AND (data1 <= 15) THEN
+    L_array(3*lCounter) <= std_logic_vector(to_unsigned(data1 + 55,8));
   END IF;
-   
-END PROCESS;
- 
+
+  IF (data2 >= 0) AND (data2 <= 9) THEN
+    L_array(3*lCounter+1) <= std_logic_vector(to_unsigned(data2 + 48,8));
+  ELSIF (data2 >= 10) AND (data2 <= 15) THEN
+    L_array(3*lCounter+1) <= std_logic_vector(to_unsigned(data2 + 55,8));
+  END IF;
+ END PROCESS;
 -----------------------------------------------------
 -- COUNTERS
 NNN_counter: PROCESS(reset, res_validCount, en_validCount, clk)
@@ -458,14 +413,14 @@ END PROCESS;
       WHEN DATA_ARRAY_1 =>
         --IF seqDone = '1' THEN
           Res <= dataResults(lCounter);
-          data1 <= to_integer(unsigned(Res(7 downto 4)));
-          data2 <= to_integer(unsigned(Res(3 downto 0)));
           nextState <= DATA_ARRAY_2;
         --ELSIF seqDone = '0' THEN
           --nextState <= DATA_ARRAY_1;
         --END IF;
        
       WHEN DATA_ARRAY_2 =>
+        data1 <= to_integer(unsigned(Res(7 downto 4)));
+        data2 <= to_integer(unsigned(Res(3 downto 0)));
         IF lCounter /= 6 THEN
           en_lCounter <= '1';
           nextState <= DATA_ARRAY_1;
