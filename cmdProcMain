@@ -2,9 +2,7 @@ LIBRARY ieee;
 USE ieee.std_logic_1164.ALL;
 USE ieee.numeric_std.ALL;
 USE work.common_pack.ALL;
--- NOTES:
--- data_reg is not assigned to rxData (ASK TA IF ITS IMPLEMENTED CORRECTLY !!!)
---
+
 ENTITY cmdProc IS
 PORT (
     clk:          IN std_logic;
@@ -28,16 +26,27 @@ PORT (
 END cmdProc;
 
 ARCHITECTURE command OF cmdProc IS
- 
+
  -- STATE DECLARATION
- TYPE STATE_TYPE IS (INIT, ECHO, L_CARRIAGE, P_CARRIAGE, L_DASH, P_DASH, RECEIVING, WAIT_NNN, P_PRINT,
- L_PRINT, CHECK_NNN, NEW_LINE, ANNN_DASH, S_START, WAIT_BYTES, RECEIVE_BYTES, TRANSMIT_BYTES, EQUAL_NNN);
+ TYPE STATE_TYPE IS (INIT, RECEIVING, CARRIAGE, CARRIAGE_OUT, WAIT_NNN, L_TRANS_1, L_TRANS_2,P_TRANS_1, P_TRANS_2, DATA_ARRAY_1, DATA_ARRAY_2, CHECK_NNN,
+ CHECK_N1, CHECK_N2, CHECK_N3, S_START, WAIT_BYTES, RECEIVE_BYTES, TRANSMIT_BYTE_1,TRANSMIT_BYTE_2,SPACE ,EQUAL_NNN);
+ 
  SIGNAL curState, nextState: state_type;
- SIGNAL data_reg: std_logic_vector(7 DOWNTO 0); -- Added signal data_reg for input to remain steady for at least 1 clock cycle
+ SIGNAL rxData_reg: std_logic_vector(7 DOWNTO 0); -- Added signal data_reg for input to remain steady for at least 1 clock cycle
+ SIGNAL dataReg: std_logic_vector(7 DOWNTO 0);
  
  -- COUNTER SIGNALS  
  SIGNAL validCount: integer range 0 to 3;
  SIGNAL en_validCount, res_validCount: bit;
+ SIGNAL en_dataReg: bit;
+ SIGNAL en_echo: bit;
+ 
+ SIGNAL lCounter: integer range 0 to 6;
+ SIGNAL en_lCounter, res_lCounter: bit;
+ SIGNAL lTransCount: integer range 0 to 19;
+ SIGNAL en_lTransCount, res_lTransCount: bit;
+ SIGNAL pTransCount: integer range 0 to 19;
+ SIGNAL en_pTransCount, res_pTransCount: bit;
  
  SIGNAL dataReadyCount: integer range 0 to 999;
  SIGNAL res_dataReadyCount, en_dataReadyCount: bit;
@@ -46,130 +55,233 @@ ARCHITECTURE command OF cmdProc IS
  SIGNAL BOOL_N1, BOOL_N2, BOOL_N3: BOOLEAN := FALSE;
  
  -- ARRAY SIGNALS
- SIGNAL L_array: CHAR_ARRAY_TYPE(20 downto 0); -- CHECK IF DEFINED CORRECTLY !!!
- SIGNAL P_array: CHAR_ARRAY_TYPE(5 downto 0);
- SIGNAL byte_array: CHAR_ARRAY_TYPE(1 downto 0);
+ SIGNAL L_array: CHAR_ARRAY_TYPE(0 to 19); -- CHECK IF DEFINED CORRECTLY !!!
+ SIGNAL P_array: CHAR_ARRAY_TYPE(0 to 5);
  
  -- DEFINED INTEGER SIGNALS USED IN PROCESSES
  -- PROCESS byteToHex
- SIGNAL byte1: integer; -- IF RANGE REQUIRED TILL 15
- SIGNAL byte2: integer;
- SIGNAL byteOut1: std_logic_vector(7 DOWNTO 0);
- SIGNAL byteOut2: std_logic_vector(7 DOWNTO 0);
+ SIGNAL byte1, byte2: integer range 0 to 15; -- IF RANGE REQUIRED TILL 15
+ SIGNAL byteOut1, byteOut2: std_logic_vector(7 DOWNTO 0);
  
  -- PROCESS dataRes_to_Hex
  SIGNAL Res: std_logic_vector(7 DOWNTO 0);
- SIGNAL data1: integer;
- SIGNAL data2: integer;
+ SIGNAL data1, data2: integer range 0 to 15;
  
  -- PROCESS NNN_CHECK
- SIGNAL n1: std_logic_vector(7 DOWNTO 0);
- SIGNAL n2: std_logic_vector(7 DOWNTO 0);
- SIGNAL n3: std_logic_vector(7 DOWNTO 0);
- SIGNAL num1: integer;
- SIGNAL num2: integer;
- SIGNAL num3: integer;
-
+ SIGNAL n1, n2, n3: std_logic_vector(7 DOWNTO 0);
+ SIGNAL num1, num2, num3: integer range 0 to 9;
+ SIGNAL NNN: integer range 0 to 999;
+ 
+BEGIN
 -----------------------------------------------------  
   -- STATE REGISTERS
-  State_register: PROCESS (reset, clk, curState, rxData, data_reg, nextState)
+  State_register: PROCESS (reset, clk, curState, rxData)
   BEGIN
     IF reset = '1' THEN
       curState <= INIT;
     ELSIF clk'EVENT AND clk = '1' THEN
-      data_reg <= rxData;  -- CREATING A REGISTER TO STORE rxData STABALIZING THE MACHINE
+      rxData_reg <= rxData;  -- CREATING A REGISTER TO STORE rxData STABALIZING THE MACHINE
       curState <= nextState;
     END IF;
   END PROCESS;
+
+  data_reg: PROCESS (clk, rxData, en_dataReg)
+  BEGIN
+    IF clk'EVENT AND clk = '1' THEN
+      IF en_dataReg = '1' THEN
+        dataReg <= rxData;  -- CREATING A REGISTER TO STORE 'a', 'A', 'L', 'l', 'P', OR 'p'
+      END IF;
+    END IF;
+  END PROCESS;
+ 
+-----------------------------------------------------
+-- TRANSMISSION FUNCTION
+transmitOut: PROCESS (en_echo,curState, rxData_reg,byteOut1,byteOut2, clk)
+BEGIN
+  IF clk'EVENT AND clk = '1' THEN
+    IF txDone = '0' THEN
+      txNow <= '0';
+   
+    ELSIF txDone = '1' THEN
+      IF en_echo = '1' THEN
+        txnow <= '1';
+        txData <= rxData_reg;
+       
+      ELSIF curState = CARRIAGE OR curState = CARRIAGE_OUT THEN
+        txData <= X"0D";
+        txNow <= '1';
+     
+      ELSIF curState = L_TRANS_1 THEN
+         txData <= L_array(lTransCount);
+         txNow <= '1';
+         
+      ELSIF curState = P_TRANS_1 THEN
+         txData <= P_array(pTransCount);
+         txNow <= '1';
+ 
+      ELSIF curState = SPACE THEN
+        txData <= X"20";
+        txNow <= '1';
+     
+      ELSIF curState = TRANSMIT_BYTE_1 THEN
+        txData <= byteOut1;
+        txNow <= '1';
+      ELSIF curState = TRANSMIT_BYTE_2 THEN
+        txData <= byteOut2;
+        txNow <= '1';
+      ELSE
+        txNow <= '0';
+       
+      END IF;
+    END IF;
+  END IF;
+ 
+END PROCESS;
 -----------------------------------------------------
 -- CONVERSIONS
-byteToHex: PROCESS(byte)
+byteToHex: PROCESS(byte, byte1, byte2)
 BEGIN
-  byte1 <= to_integer(unsigned(byte(7 DOWNTO 4)));
-  byte2 <= to_integer(unsigned(byte(3 DOWNTO 0)));
-   
-  IF ((byte1 >= 0) OR ((byte2 >= 0) AND (byte1 <= 9)) OR (byte2 <= 9)) THEN
+ 
+  IF ((byte1 >= 0) AND (byte1 <= 9)) OR ((byte2 >= 0) AND (byte2 <= 9)) THEN
     byteOut1 <= "0011" & byte(7 DOWNTO 4);
     byteOut2 <= "0011" & byte(3 DOWNTO 0);
 
-  ELSIF (byte1 >= 10) OR ((byte2 >= 10) AND (byte1 <= 15)) OR ((byte2 >= 15) THEN
-    IF byte1 = 10 OR byte2 = 10 THEN
+  ELSIF ((byte1 >= 10) AND (byte1 <= 15)) OR ((byte2 >= 10) AND (byte2 <= 15)) THEN
+    IF byte1 = 10 THEN
       byteOut1 <= X"41"; -- A
+    ELSIF byte2 = 10 THEN
       byteOut2 <= X"41"; -- A
-    ELSIF byte1 = 11 OR byte2 = 11 THEN
+
+    ELSIF byte1 = 11 THEN
       byteOut1 <= X"42"; -- B
+    ELSIF byte2 = 11 THEN
       byteOut2 <= X"42"; -- B
-    ELSIF byte1 = 12 OR byte2 = 12 THEN
+
+    ELSIF byte1 = 12 THEN  
       byteOut1 <= X"43"; -- C
+    ELSIF byte2 = 12 THEN
       byteOut2 <= X"43"; -- C
-    ELSIF byte1 = 13 OR byte2 = 13 THEN
+
+    ELSIF byte1 = 13 THEN
       byteOut1 <= X"44"; -- D
+    ELSIF byte2 = 13 THEN
       byteOut2 <= X"44"; -- D
-    ELSIF byte1 = 14 OR byte2 = 14 THEN
+
+    ELSIF byte1 = 14 THEN
       byteOut1 <= X"45"; -- E
+    ELSIF byte2 = 14 THEN
       byteOut2 <= X"45"; -- E
-    ELSIF byte1 = 15 OR byte2 = 15 THEN
+
+    ELSIF byte1 = 15 THEN  
       byteOut1 <= X"46"; -- F
+    ELSIF byte2 = 15 THEN
       byteOut2 <= X"46"; -- F
+    END IF;
+  ELSE
+    byteOut1 <= X"00"; -- NULL
+    byteOut2 <= X"00"; -- NULL
   END IF;
  
 END PROCESS;
 
 -----------------------------------------------------
 -- ASCII input from DP to hex output to Tx
-dataRes_to_Hex: PROCESS(Res_reg) -- CHECK SENSITIVITY LIST !!!
+dataRes_to_Hex: PROCESS(dataResults, lCounter, Res, data1, data2) -- CHECK SENSITIVITY LIST !!!
 BEGIN    
-  FOR i in 0 to 6 LOOP
-     Res <= dataResults(i)
-     data1 <= to_integer(Res(7 downto 4));
-     data2 <= to_integer(Res(3 downto 0));
-                
-     IF ((data1 >= 0) OR ((data2 >= 0) AND (data1 <= 9)) OR (data2 <= 9)) THEN
-       L_array(3i) <= "0011" & Res(7 DOWNTO 4);
-       L_array(3i+1) <= "0011" & Res(3 DOWNTO 0);    
-     
-     ELSIF (data1 >= 10) OR ((data2 >= 10) AND (data1 <= 15)) OR ((data2 >= 15) THEN
-      IF data1 = 10 OR data2 = 10 THEN
-        L_array(3i) <= X"41"; -- A
-        L_array(3i+1) <= X"41"; -- A
-      ELSIF data1 = 11 OR data2 = 11 THEN
-        L_array(3i) <= X"42"; -- B
-        L_array(3i+1) <= X"42"; -- B
-      ELSIF data1 = 12 OR data2 = 12 THEN
-        L_array(3i) <= X"43"; -- C
-        L_array(3i+1) <= X"43"; -- C
-      ELSIF data1 = 13 OR data2 = 13 THEN
-        L_array(3i) <= X"44"; -- D
-        L_array(3i+1) <= X"44"; -- D
-      ELSIF data1 = 14 OR data2 = 14 THEN
-        L_array(3i) <= X"45"; -- E
-        L_array(3i+1) <= X"45"; -- E
-      ELSIF data1 = 15 OR data2 = 15 THEN
-        L_array(3i) <= X"46"; -- F
-        L_array(3i+1) <= X"46"; -- F
-      END IF;
-      END IF;
-  END loop;
+  IF lCounter /= 0 THEN
+    L_array((3*lCounter)-1) <= X"20";
+  END IF;
  
-  FOR j in 1 to 7 LOOP
-    L_array((3*j)-1) <= X"20";
-  END loop;
-END PROCESS;   
+  IF ((data1 >= 0) AND (data1 <= 9)) OR ((data2 >= 0) AND (data2 <= 9)) THEN
+    L_array(3*lCounter) <= "0011" & Res(7 DOWNTO 4);
+    L_array(3*lCounter+1) <= "0011" & Res(3 DOWNTO 0);
+ 
+  ELSIF ((data1 >= 10) AND (data1 <= 15)) OR ((data2 >= 10) AND (data2 <= 15)) THEN
+    IF data1 = 10 THEN
+      L_array(3*lCounter) <= X"41"; -- A
+    ELSIF data2 = 10 THEN
+      L_array(3*lCounter+1) <= X"41"; -- A
+     
+    ELSIF data1 = 11 THEN
+      L_array(3*lCounter) <= X"42"; -- B
+    ELSIF data2 = 11 THEN
+      L_array(3*lCounter+1) <= X"42"; -- B
+     
+    ELSIF data1 = 12 THEN  
+      L_array(3*lCounter) <= X"43"; -- C
+    ELSIF data2 = 12 THEN
+      L_array(3*lCounter+1) <= X"43"; -- C
+     
+    ELSIF data1 = 13 THEN
+      L_array(3*lCounter) <= X"44"; -- D
+    ELSIF data2 = 13 THEN
+      L_array(3*lCounter+1) <= X"44"; -- D
+     
+    ELSIF data1 = 14 THEN
+      L_array(3*lCounter) <= X"45"; -- E
+    ELSIF data2 = 14 THEN
+      L_array(3*lCounter+1) <= X"45"; -- E
+   
+    ELSIF data1 = 15 THEN
+      L_array(3*lCounter) <= X"46"; -- F
+    ELSIF data2 = 15 THEN
+      L_array(3*lCounter+1) <= X"46"; -- F
+   
+    END IF;
+  END IF;
+   
+END PROCESS;
  
 -----------------------------------------------------
 -- COUNTERS
-NNN_counter: PROCESS(reset, res_validCount, en_validCount, clk, rxnow)
+NNN_counter: PROCESS(reset, res_validCount, en_validCount, clk)
 BEGIN
   IF reset = '1' OR res_validCount = '1' THEN
       validCount <= 0;
- 
   ELSIF clk'EVENT AND clk = '1' THEN
-    IF en_validCount = '1' AND curState = WAIT_NNN THEN
-      IF rxnow = '1' THEN
-        validCount <= validCount + 1;
-      ELSE
-        validCount <= validCount;
-      END IF;
+    IF en_validCount = '1' THEN
+      validCount <= validCount + 1;
+    ELSE
+      validCount <= validCount;
+    END IF;
+  END IF;
+END PROCESS;
+
+L_COUNTER:PROCESS(reset, res_lCounter, en_lCounter, clk)
+BEGIN
+  IF reset = '1' OR res_lCounter = '1' THEN
+    lCounter <= 0;
+  ELSIF clk'EVENT AND clk = '1' THEN
+    IF en_lCounter = '1' THEN
+      lCounter <= lCounter + 1;
+    ELSE
+      lCounter <= lCounter;
+    END IF;
+  END IF;
+END PROCESS;
+
+LTRANS_COUNTER: PROCESS(reset,res_lTransCount, en_lTransCount, clk)
+BEGIN
+  IF reset = '1' OR res_lTransCount = '1' THEN
+    lTransCount <= 0;
+  ELSIF clk'EVENT AND clk = '1' THEN
+    IF en_lTransCount = '1' THEN
+      lTransCount <= lTransCount + 1;
+    ELSE
+      lTransCount <= lTransCount;
+    END IF;
+  END IF;
+END PROCESS;
+
+PTRANS_COUNTER: PROCESS(reset,res_pTransCount, en_pTransCount, clk)
+BEGIN
+  IF reset = '1' OR res_pTransCount = '1' THEN
+    pTransCount <= 0;
+  ELSIF clk'EVENT AND clk = '1' THEN
+    IF en_pTransCount = '1' THEN
+      pTransCount <= pTransCount + 1;
+    ELSE
+      pTransCount <= pTransCount;
     END IF;
   END IF;
 END PROCESS;
@@ -179,276 +291,276 @@ BEGIN
   IF reset = '1' OR res_dataReadyCount = '1' THEN
       dataReadyCount <= 0;
   ELSIF clk'EVENT AND clk = '1' THEN
-    IF en_dataReadyCount = '1' AND curState = RECEIVE_BYTES THEN
+    IF en_dataReadyCount = '1' THEN
       dataReadyCount <= dataReadyCount + 1;
     ELSE
       dataReadyCount <= dataReadyCount;
     END IF;
   END IF;
 END PROCESS;
- 
+
+
+
+
 -----------------------------------------------------
-NNN_CHECK: PROCESS(validCount, clk)
+NNN_CHECK: PROCESS(validCount, clk, rxData)
 BEGIN
-  IF validCount = 1 THEN
-    n1 <= data_reg;
-  ELSIF validCount = 2 THEN
-    n2 <= data_reg;
-  ELSIF validCount = 3 THEN
-    n3 <= data_reg;
-  END IF;
-     
-  IF n1(7 DOWNTO 4) = "0011" AND n2(7 DOWNTO 4) = "0011" AND n3(7 DOWNTO 4) = "0011" THEN
-    num1 <= to_integer(n1(3 DOWNTO 0));
-    num2 <= to_integer(n2(3 DOWNTO 0));
-    num3 <= to_integer(n3(3 DOWNTO 0));
-       
-    IF (num1 >= 0) AND (num2>= 0) AND (num3 >= 0) AND (num1<= 9) AND (num2<= 9) AND (num3<= 9) THEN
+  IF n1(7 DOWNTO 4) = "0011" THEN
+    num1 <= to_integer(unsigned(n1(3 DOWNTO 0)));
+    IF (num1 >= 0) AND (num1<= 9) THEN
       numWords_bcd(0) <= n1(3 DOWNTO 0);
-      numWords_bcd(1) <= n2(3 DOWNTO 0);
-      numWords_bcd(2) <= n3(3 DOWNTO 0);
-      NNN <= (num1*100) + (num2*10) + (num3);
       BOOL_N1 <= TRUE;
-      BOOL_N2 <= TRUE;
-      BOOL_N3 <= TRUE;
-     
     ELSE
-      numWords_bcd(0) <= "0000";
-      numWords_bcd(1) <= "0000";
-      numWords_bcd(2) <= "0000";
       BOOL_N1 <= FALSE;
-      BOOL_N2 <= FALSE;
-      BOOL_N3 <= FALSE;
-      nextState <= INIT; -- REMOVE
-  ELSE
-    numWords_bcd(0) <= "0000";
-    numWords_bcd(1) <= "0000";
-    numWords_bcd(2) <= "0000";
-    BOOL_N1 <= FALSE;
-    BOOL_N2 <= FALSE;
-    BOOL_N3 <= FALSE;
-    nextState <= INIT; -- REMOVE
-     
+      numWords_bcd(0) <= "0000";
     END IF;
   END IF;
+     
+  IF n2(7 DOWNTO 4) = "0011" THEN
+    num2 <= to_integer(unsigned(n2(3 DOWNTO 0)));
+    IF (num2 >= 0) AND (num2<= 9) THEN
+      numWords_bcd(1) <= n2(3 DOWNTO 0);
+      BOOL_N2 <= TRUE;
+    ELSE
+      BOOL_N2 <= FALSE;
+      numWords_bcd(1) <= "0000";
+    END IF;
+  END IF;
+         
+  IF n3(7 DOWNTO 4) = "0011" THEN
+    num3 <= to_integer(unsigned(n3(3 DOWNTO 0)));
+    IF (num3 >= 0) AND (num3<= 9) THEN
+      numWords_bcd(2) <= n3(3 DOWNTO 0);
+      BOOL_N3 <= TRUE;
+      NNN <= (num1*100) + (num2*10) + (num3);
+    ELSE
+      BOOL_N3 <= FALSE;
+      numWords_bcd(2) <= "0000";
+    END IF;
+  END IF;
+ 
 END PROCESS;
 
 -----------------------------------------------------
-
  --P PRINT
- Peak_print: PROCESS()
+ Peak_print: PROCESS(L_array, maxIndex)
  BEGIN
    P_array(0)<= L_array(9);
    P_array(1)<= L_array(10);
    P_array(2)<= X"20";
    
-   P_array(3)<= "0011" & maxIndex(0);
+   P_array(3)<= "0011" & maxIndex(2);
    P_array(4)<= "0011" & maxIndex(1);
-   P_array(5)<= "0011" & maxIndex(2);
+   P_array(5)<= "0011" & maxIndex(0);
 END PROCESS;
 
 -----------------------------------------------------
   -- NEXT STATE LOGIC
-  nextStateLogic: PROCESS(curState, data_reg)
+  nextStateLogic: PROCESS(curState, rxData_reg, rxNow, txDone, BOOL_N1, BOOL_N2, BOOL_N3, byte,dataReady)
   BEGIN
      -- assign default values
     start  <= '0';
     rxDone <= '0';
-    --rxnow <= '1'; -- equivalent to 'valid'
-    txNow  <= '0';
-    seqDone <= '0';
    
     -- Assign counter values
     res_dataReadyCount <= '0';
     en_dataReadyCount <= '0';
     en_validCount <= '0';
     res_validCount <= '0';
- 
+    en_echo <= '0';
+    en_dataReg <= '0';
+    en_lCounter <= '0';
+    en_lTransCount <= '0';
+
     CASE curState IS
  
       WHEN INIT =>
         IF rxNow = '1' THEN
-          nextState <= ECHO;
+          rxDone <= '1';
+          nextState <= RECEIVING;
         ELSIF rxNow = '0' THEN
           nextState <= INIT;
         END IF;
      
-      WHEN ECHO =>
-        IF txDone = '1' THEN
-          txNow <= '0';
-          nextState <= ECHO;
-        ELSIF txDone = '0' THEN
-          IF data_reg = X"41" OR data_reg = X"61" THEN -- Detects A or a
-            nextState <= RECEIVING;
-          ELSIF data_reg = X"50" OR data_reg = X"70" THEN -- Detects P or p
-            nextState <= P_CARRIAGE;
-          ELSIF data_reg = X"4C" OR data_reg = X"6C" THEN -- Detects L or l
-            nextState <= L_CARRIAGE;
-          ELSE -- IF NOT P, L, A
-            txData <= data_reg;
-            txNow <= '1';
-            nextState <= INIT;
-          END IF;
-        END IF;
-     
-    WHEN P_CARRIAGE =>
-      IF txDone = '1' THEN
-        txNow <= '0';
-        nextState <= P_CARRIAGE;
-      ELSIF txDone = '0' THEN
-        txData <= X"0D";
-        txNow <= '1';
-        nextState <= P_DASH;
-      END IF;
-     
- 
-    WHEN L_CARRIAGE =>
-      IF txDone = '1' THEN
-        txNow <= '0';
-      ELSIF txDone = '0' THEN
-        txData <= X"0D";
-        txNow <= '1';
-      END IF;
-      nextState <= L_DASH;
-     
-     
-    WHEN P_DASH =>
-      FOR I IN 0 TO 4 LOOP
-        IF txDone = '1' THEN
-          txNow <= '0';
-          nextState <= P_DASH;
-        ELSIF txDone = '0' THEN
-          txData <= X"3D";
-          txNow <= '1';
-          nextState <= P_PRINT;
-      END LOOP;
-     
-   
-    WHEN L_DASH =>
-      FOR I IN 0 TO 4 LOOP
-        IF txDone = '1' THEN
-          txNow <= '0';
-        ELSIF txDone = '0' THEN
-          txData <= X"3D";
-          txNow <= '1';
-      END LOOP;
-      nextState <= L_PRINT;
-     
-   
       WHEN RECEIVING =>
-        IF data_reg = X"41" OR data_reg = X"61" THEN -- Detects A or a
-          nextState <= WAIT_NNN;                     -- waits for NNN to be typed to the terminal
-       
-        ELSIF data_reg = X"50" OR data_reg = X"70" THEN -- Detects P or p
-          nextState <= P_PRINT;
-       
-        ELSIF data_reg = X"4C" OR data_reg = X"6C" THEN -- Detects L or l
-          nextState <= L_PRINT;
-       
-        ELSE -- If not A, P, or L
+        en_echo <= '1';
+        IF rxData_reg = X"41" OR rxData_reg = X"61" THEN -- Detects A or a
+          en_dataReg <= '1';
+          nextState <= WAIT_NNN;
+        ELSIF rxData_reg = X"50" OR rxData_reg = X"70" OR rxData_reg = X"4C" OR rxData_reg = X"6C" THEN -- Detects P or p & L or l
+          en_dataReg <= '1';
+          nextState <= CARRIAGE;
+        ELSE -- IF NOT P, L, A
           nextState <= INIT;
-        END IF;  
+        END IF;
+
+   
+    WHEN CARRIAGE =>
+      IF txDone = '0' THEN
+        nextState <= CARRIAGE;
+      ELSIF txDone = '1' THEN
+        IF dataReg = X"50" OR dataReg = X"70" OR dataReg = X"4C" OR dataReg = X"6C" THEN -- p, l
+          nextState <= DATA_ARRAY_1;
+        ELSIF BOOL_N3 = TRUE THEN -- ANNN
+          nextState <= S_START;
+        END IF;
+      END IF;
+     
        
       WHEN WAIT_NNN =>
         IF rxNow = '1' THEN
-          en_validCount = '1';
+          rxDone <= '1';
+          en_validCount <= '1';
           nextState <= CHECK_NNN;
         ELSIF rxNow = '0' THEN
           nextState <= WAIT_NNN;
         END IF;
      
-      WHEN L_PRINT =>
-        IF seqDone = '1' THEN
-          FOR i in in 0 to 20 LOOP
-            --L_ARRAY HERE?
-            IF txDone = '1' THEN
-              txNow = '0';
-            ELSIF txDone = '0' THEN
-              txData <= L_array(i);
-              txNow = '1';
-            END IF;
-          END LOOP;
-        ELSE
-          nextState <= INIT;
-        END IF;
-     
-      WHEN P_PRINT =>
-        IF seqDone = '1' THEN
-          FOR i in 0 to 5 LOOP
-            --P_ARRAY HERE?
-            IF txDone = '1' THEN
-              txNow = '0';
-              nextState <= P_PRINT;
-            ELSIF txDone = '0' THEN
-              txData <= P_array(i);
-              txNow = '1';
-             
-            END IF;
-          END LOOP;
-        ELSE
-          nextState <= INIT;
-        END IF;
-     
       WHEN CHECK_NNN =>
-        IF BOOL_N1 = TRUE OR BOOL_N2 = TRUE THEN
-          nextState <= WAIT_NNN;
-        ELSE  -- IF N1 OR N2 ARE NOT INTEGERS
-          nextState <= INIT;
-       
-        IF BOOL_N3 = TRUE THEN
-          nextState <= NEW_LINE;
-        ELSE  -- IF N3 IS NOT AN INTEGER
-          nextState <= INIT;
-     
-      WHEN NEW_LINE =>
-        IF txDone = '1' THEN
-          txNow <= '0';
-        ELSIF txDone = '0' THEN
-          txData <= X"0D";
-          txNow <= '1';
+        IF validCount = 1 THEN
+          n1 <= rxData;
+          nextState <= CHECK_N1;
+        ELSIF validCount = 2 THEN
+          n2 <= rxData;
+          nextState <= CHECK_N2;
+        ELSIF validCount = 3 THEN
+          n3 <= rxData;
+          nextState <= CHECK_N3;
         END IF;
-        nextState <= ANNN_DASH;
+       
      
-      WHEN ANNN_DASH =>
-        FOR I IN 0 TO 4 LOOP
-          IF txDone = '1' THEN
-            txNow <= '0';
-          ELSIF txDone = '0' THEN
-            txData <= X"3D";
-            txNow <= '1';
-        END LOOP;
-        nextState <= S_START;
-
+      WHEN CHECK_N1 =>
+        en_echo <= '1';
+        IF BOOL_N1 = TRUE THEN
+          nextState <= WAIT_NNN;
+        ELSIF BOOL_N1 = FALSE THEN
+          nextState <= INIT;
+        END IF;
+       
+        WHEN CHECK_N2 =>
+          en_echo <= '1';
+          IF BOOL_N2 = TRUE THEN
+            nextState <= WAIT_NNN;
+          ELSIF BOOL_N2 = FALSE THEN
+            nextState <= INIT;
+          END IF;
+         
+        WHEN CHECK_N3 =>
+          en_echo <= '1';
+          IF BOOL_N3 = TRUE THEN
+            en_dataReg <= '1';
+            nextState <= CARRIAGE;
+          ELSIF BOOL_N3 = FALSE THEN
+            nextState <= INIT;
+          END IF;
+         
+     
+      WHEN DATA_ARRAY_1 =>
+        --IF seqDone = '1' THEN
+          Res <= dataResults(lCounter);
+          data1 <= to_integer(unsigned(Res(7 downto 4)));
+          data2 <= to_integer(unsigned(Res(3 downto 0)));
+          nextState <= DATA_ARRAY_2;
+        --ELSIF seqDone = '0' THEN
+          --nextState <= DATA_ARRAY_1;
+        --END IF;
+       
+      WHEN DATA_ARRAY_2 =>
+        IF lCounter /= 6 THEN
+          en_lCounter <= '1';
+          nextState <= DATA_ARRAY_1;
+        ELSIF lCounter = 6 THEN
+          IF rxData_reg = X"4C" OR rxData_reg = X"6C" THEN -- Detects L or l
+            nextState <= L_TRANS_1;
+          ELSIF rxData_reg = X"50" OR rxData_reg = X"70" THEN -- Detects P or p
+            nextState <= P_TRANS_1;
+          END IF;
+        END IF;
+       
+      WHEN L_TRANS_1 =>
+        IF txDone = '0' THEN
+          nextState <= L_TRANS_1;
+        ELSIF txDone = '1' THEN
+          nextState <= L_TRANS_2;
+        END IF;
+       
+      WHEN L_TRANS_2 =>
+        IF lTransCount /= 19 THEN  
+          en_lTransCount <= '1';
+          nextState <= L_TRANS_1;
+        ELSIF lTransCount = 19 THEN
+          nextState <= CARRIAGE_OUT;
+        END IF;
+         
+      WHEN CARRIAGE_OUT =>
+        IF txDone = '0' THEN
+          nextState <= CARRIAGE_OUT;
+        ELSIF txDone = '1' THEN
+          nextState <= INIT;
+        END IF;
+       
+   
+      WHEN P_TRANS_1 =>
+        IF txDone = '0' THEN
+          nextState <= P_TRANS_1;
+        ELSIF txDone = '1' THEN
+          nextState <= P_TRANS_2;
+        END IF;
+       
+      WHEN P_TRANS_2 =>
+        IF pTransCount /= 5 THEN  
+          en_pTransCount <= '1';
+          nextState <= P_TRANS_1;
+        ELSIF pTransCount = 5 THEN
+          nextState <= CARRIAGE_OUT;
+        END IF;
+       
       WHEN S_START =>
-        start = '1'; -- NOTE: start is initialized as 0 hence should only be HIGH for 1 clk cycle
+        start <= '1'; -- NOTE: start is initialized as 0 hence should only be HIGH for 1 clk cycle
         nextState <= WAIT_BYTES;
 
       WHEN WAIT_BYTES =>
         IF dataReady = '1' THEN
+          en_dataReadyCount <= '1';
           nextState <= RECEIVE_BYTES;
         ELSIF dataReady = '0' THEN
           nextState <= WAIT_BYTES;
         END IF;
+
      
       WHEN RECEIVE_BYTES =>
-        en_dataReadyCount = '1';
-        nextState <= TRANSMIT_BYTES;
-     
-      WHEN TRANSMIT_BYTES => -- FIX CODE
-        IF txDone = '1' THEN
-          txNow = '0';
-          nextState <= TRANSMIT_BYTES;
-        ELSIF txDone = '0' THEN
-          txNow = '1';
+        byte1 <= to_integer(unsigned(byte(7 DOWNTO 4)));
+        byte2 <= to_integer(unsigned(byte(3 DOWNTO 0)));
+        nextState <= TRANSMIT_BYTE_1;
+       
+      WHEN TRANSMIT_BYTE_1 =>
+        IF txDone = '0' THEN
+          nextState <= TRANSMIT_BYTE_1;
+        ELSIF txDone = '1' THEN
+          nextState <= TRANSMIT_BYTE_2;
+        END IF;
+
+      WHEN TRANSMIT_BYTE_2 =>
+        IF txDone = '0' THEN
+          nextState <= TRANSMIT_BYTE_2;
+        ELSIF txDone = '1' THEN
+          nextState <= SPACE;
+        END IF;
+       
+      WHEN SPACE =>
+        IF txDone = '0' THEN
+          nextState <= SPACE;
+        ELSIF txDone = '1' THEN
           nextState <= EQUAL_NNN;
         END IF;
+       
      
       WHEN EQUAL_NNN =>
         IF dataReadyCount = NNN THEN -- NOTE: 'NNN' is not defined yet but it represents the integer value of BCD_numWords (type: array)
-          res_dataReadyCount = '1'; -- CHECK MIGHT NEED TO RESET IN NEXT STATE
-          nextState <= INIT;   -- GO TO NEXT STATE
+          res_dataReadyCount <= '1'; -- CHECK MIGHT NEED TO RESET IN NEXT STATE
+          nextState <= INIT;   -- CHNAGE TO INIT !!!
         ELSIF dataReadyCount /= NNN THEN -- If its not equal to NNN
-          nextState <= WAIT_BYTES;
+          nextState <= S_START;
         END IF;
    
       WHEN OTHERS =>
@@ -456,7 +568,7 @@ END PROCESS;
    
     END CASE;
   END PROCESS;
- 
+END;
   -----------------------------------------------------
 -- WRITE IMPROVEMENT SECTION ON REPORT:
 -- TO IMPROVE OUR CODE, WE COULD HAVE SEPARATED OUR COMBINATIONAL LOGIC
