@@ -279,7 +279,7 @@ END PROCESS;
           rxDone <= '1';          -- States that data has been received from Rx
           nextState <= RECEIVING; -- Then go to the 'RECEIVING' state
         ELSIF rxNow = '0' THEN    -- If no data is outputted from Rx  
-          nextState <= INIT;      -- Remain in inital state
+          nextState <= INIT;      -- Remain in inital state   
         END IF;
      
       WHEN RECEIVING =>
@@ -307,51 +307,51 @@ END PROCESS;
       END IF;
      
        
-      WHEN WAIT_NNN =>
-        IF rxNow = '1' THEN
-          rxDone <= '1';
-          en_count <= '1';
-          nextState <= CHECK_NNN;
-        ELSIF rxNow = '0' THEN
-          nextState <= WAIT_NNN;
+      WHEN WAIT_NNN =>            -- State receives NNN
+        IF rxNow = '1' THEN       -- If data is outputted from Rx
+          rxDone <= '1';          -- State that data has been received from Rx
+          en_count <= '1';        -- Increment Main Counter
+          nextState <= CHECK_NNN; -- Then go to 'CHECK_NNN' state to check if 3 bytes have been recieved 
+        ELSIF rxNow = '0' THEN    -- If no data is outputted from Rx
+          nextState <= WAIT_NNN;  -- Remain in 'WAIT_NNN' state to receive a byte from Rx
         END IF;
      
-      WHEN CHECK_NNN =>
-        IF Count = 1 THEN
-          n1 <= rxData;
-          nextState <= CHECK_N1;
-        ELSIF Count = 2 THEN
-          n2 <= rxData;
-          nextState <= CHECK_N2;
-        ELSIF Count = 3 THEN
-          n3 <= rxData;
-          nextState <= CHECK_N3;
+      WHEN CHECK_NNN =>           -- State checks if 3 numbers have been recieved 
+        IF Count = 1 THEN         -- If Main Counter is equal to 1 
+          n1 <= rxData;           -- Assign the 1st byte to signal n1 
+          nextState <= CHECK_N1;  -- Then go to 'CHECK_N1' state to check if 1st byte is a number 
+        ELSIF Count = 2 THEN      -- If Main Counter is equal to 2 
+          n2 <= rxData;           -- Assign the 2nd byte to signal n2
+          nextState <= CHECK_N2;  -- Then go to 'CHECK_N2' state to check if 2nd byte is a number
+        ELSIF Count = 3 THEN      -- If Main Counter is equal to 3
+          n3 <= rxData;           -- Assign the 3rd byte to signal n3
+          nextState <= CHECK_N3;  -- Then go to 'CHECK_N3' state to check if 3rd byte is a number
         END IF;
        
-      WHEN CHECK_N1 =>
-        en_echo <= '1';
-        IF BOOL_N1 = TRUE THEN
-          nextState <= WAIT_NNN;
-        ELSIF BOOL_N1 = FALSE THEN
-          nextState <= INIT;
+      WHEN CHECK_N1 =>             -- State checks if 1st byte is a number 
+        en_echo <= '1';            -- Enabling echo to echo received byte 
+        IF BOOL_N1 = TRUE THEN     -- If 1st byte is a number 
+          nextState <= WAIT_NNN;   -- Then go to 'WAIT_NNN' to receive 2nd byte (i.e., N2)
+        ELSIF BOOL_N1 = FALSE THEN -- If 1st byte is NOT a number 
+          nextState <= INIT;       -- Then go back to initial state 
         END IF;
        
-        WHEN CHECK_N2 =>
-          en_echo <= '1';
-          IF BOOL_N2 = TRUE THEN
-            nextState <= WAIT_NNN;
-          ELSIF BOOL_N2 = FALSE THEN
-            nextState <= INIT;
-          END IF;
+      WHEN CHECK_N2 =>             -- State checks if 2nd byte is a number
+        en_echo <= '1';            -- Enabling echo to echo received byte
+        IF BOOL_N2 = TRUE THEN     -- If 2nd byte is a number
+          nextState <= WAIT_NNN;   -- Then go to 'WAIT_NNN' to receive 3rd byte (i.e., N3)
+        ELSIF BOOL_N2 = FALSE THEN -- If 2nd byte is NOT a number
+          nextState <= INIT;       -- Then go back to initial state 
+        END IF;
          
-        WHEN CHECK_N3 =>
-          en_echo <= '1';
-          IF BOOL_N3 = TRUE THEN
-            en_dataReg <= '1';
-            nextState <= CARRIAGE;
-          ELSIF BOOL_N3 = FALSE THEN
-            nextState <= INIT;
-          END IF;
+      WHEN CHECK_N3 =>             -- State checks if 3rd byte is a number
+        en_echo <= '1';            -- Enabling echo to echo received byte
+        IF BOOL_N3 = TRUE THEN     -- If 3rd byte is a number
+          en_dataReg <= '1';       -- Register is enabled to store 3rd number (N3)
+          nextState <= CARRIAGE;   -- Then go to 'CARRIAGE' state to go to a new line after echoing ANNN or aNNN 
+        ELSIF BOOL_N3 = FALSE THEN -- If 3rd byte is NOT a number
+          nextState <= INIT;       -- Then go back to initial state
+        END IF;
          
       WHEN DATA_ARRAY_1=>
           Res <= dataResults_reg(lCounter);
