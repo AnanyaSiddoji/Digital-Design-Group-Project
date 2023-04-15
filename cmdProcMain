@@ -353,27 +353,27 @@ END PROCESS;
           nextState <= INIT;       -- Then go back to initial state
         END IF;
          
-      WHEN DATA_ARRAY_1=>
-          Res <= dataResults_reg(lCounter);
+      WHEN DATA_ARRAY_1=>                   -- State indexes array and stores each byte from dataResults in signal Res
+          Res <= dataResults_reg(lCounter); 
           nextState <= DATA_ARRAY_2;
 
        
       WHEN DATA_ARRAY_2 =>
-        data1 <= to_integer(unsigned(Res(7 downto 4)));
-        data2 <= to_integer(unsigned(Res(3 downto 0)));
-        IF lCounter /= 6 THEN
-          en_lCounter <= '1';
-          nextState <= DATA_ARRAY_1;
-        ELSIF lCounter = 6 THEN
-          IF rxData_reg = X"4C" OR rxData_reg = X"6C" THEN    -- Detects L or l
-            nextState <= L_TRANS_1;
-          ELSIF rxData_reg = X"50" OR rxData_reg = X"70" THEN -- Detects P or p
-            nextState <= P_TRANS_1;
+        data1 <= to_integer(unsigned(Res(7 downto 4)));       -- Stores 4 MSB in signal data1 
+        data2 <= to_integer(unsigned(Res(3 downto 0)));       -- Stores 4 LSB in signal data2 
+        IF lCounter /= 6 THEN                                 -- If list Counter is NOT equal to 6                      
+          en_lCounter <= '1';                                 -- Enable list Counter 
+          nextState <= DATA_ARRAY_1;                          -- Then go to 'DATA_ARRAY_1' state to index next byte in dataResults
+        ELSIF lCounter = 6 THEN                               -- If list Counter is equal to 6  
+          IF rxData_reg = X"4C" OR rxData_reg = X"6C" THEN    -- If L or l is detected 
+            nextState <= L_TRANS_1;                           -- Go to 'L_TRANS_1' state to transmit list (print L)
+          ELSIF rxData_reg = X"50" OR rxData_reg = X"70" THEN -- If P or p is detected 
+            nextState <= P_TRANS_1;                           -- Go to 'P_TRANS_1' state to transmit peak & its index (print P)
           END IF;
         END IF;
        
       WHEN L_TRANS_1 =>
-        IF txDone = '0' THEN      -- If data has no been transmitted
+        IF txDone = '0' THEN      -- If data has not been transmitted
           nextState <= L_TRANS_1; -- Remain in 'L_TRANS_1' state
         ELSIF txDone = '1' THEN   -- If data is successfully transmitted
           nextState <= L_TRANS_2; -- Go to 'L_TRANS_2' to transmit next part of list
@@ -394,11 +394,11 @@ END PROCESS;
           nextState <= INIT;         -- Go back to initial state
         END IF;
        
-      WHEN P_TRANS_1 =>
-        IF txDone = '0' THEN
-          nextState <= P_TRANS_1;
-        ELSIF txDone = '1' THEN
-          nextState <= P_TRANS_2;
+      WHEN P_TRANS_1 =>  
+        IF txDone = '0' THEN      -- If data has not been transmitted
+          nextState <= P_TRANS_1; -- Remain in 'P_TRANS_1' state
+        ELSIF txDone = '1' THEN   -- If data is successfully transmitted
+          nextState <= P_TRANS_2; -- Go to 'P_TRANS_2' to transmit next part of list
         END IF;
        
       WHEN P_TRANS_2 =>
@@ -413,40 +413,40 @@ END PROCESS;
         start <= '1';            -- Signals dataPro that cmdPro is ready to receive requested number of bytes
         nextState <= WAIT_BYTES; -- Then go to 'WAIT_BYTES' state
 
-      WHEN WAIT_BYTES =>
-        IF dataReady = '1' THEN
-          en_count <= '1';
-          nextState <= RECEIVE_BYTES;
-        ELSIF dataReady = '0' THEN
-          nextState <= WAIT_BYTES;
+      WHEN WAIT_BYTES =>              -- State waits for bytes from data Processor 
+        IF dataReady = '1' THEN       -- If byte is ready to be received from data processor 
+          en_count <= '1';            -- enable Main Counter 
+          nextState <= RECEIVE_BYTES; -- Then go to 'RECEIVE_BYTES' state to get each byte ready for transmission
+        ELSIF dataReady = '0' THEN    -- If byte is NOT ready to be received from data processor 
+          nextState <= WAIT_BYTES;    -- Remain in 'WAIT_BYTES' state 
         END IF;
 
-      WHEN RECEIVE_BYTES =>
-        byte1 <= to_integer(unsigned(byte(7 DOWNTO 4)));
-        byte2 <= to_integer(unsigned(byte(3 DOWNTO 0)));
-        IF txDone = '1' THEN
-          nextState <= TRANSMIT_BYTE_1;
-        ELSIF txDone = '0' THEN
-          nextState <= RECEIVE_BYTES;
+      WHEN RECEIVE_BYTES =>                   
+        byte1 <= to_integer(unsigned(byte(7 DOWNTO 4))); -- Stores 4 MSB in signal byte1  
+        byte2 <= to_integer(unsigned(byte(3 DOWNTO 0))); -- Stores 4 LSB in signal byte2
+        IF txDone = '1' THEN                             -- If data is successfully transmitted
+          nextState <= TRANSMIT_BYTE_1;                  -- Go to 'TRANSMIT_BYTE_1' state to transmit the 1st byte
+        ELSIF txDone = '0' THEN                          -- If data has not been transmitted
+          nextState <= RECEIVE_BYTES;                    -- Remain in 'RECEIVE_BYTES' state 
         END IF;
        
-      WHEN TRANSMIT_BYTE_1 => -- State Transmits the 1st byte
-        IF txDone = '1' THEN
-          nextState <= TRANSMIT_BYTE_1;
-        ELSIF txDone = '0' THEN
-          nextState <= WAIT_1;
+      WHEN TRANSMIT_BYTE_1 =>           -- State Transmits the 1st byte
+        IF txDone = '1' THEN            -- If txDone is still high
+          nextState <= TRANSMIT_BYTE_1; -- Remain in 'TRANSMIT_BYTE_1' state 
+        ELSIF txDone = '0' THEN         -- If txDone is low and the 1st byte has been transmitted 
+          nextState <= WAIT_1;          -- Go to 'WAIT_1' state 
         END IF;
 
-      WHEN WAIT_1 =>
-        IF txDone = '1' THEN
-          nextState <= TRANSMIT_BYTE_2;
+      WHEN WAIT_1 =>                    -- State waits for 1st byte to be successfully transmitted to transmit 2nd byte  
+        IF txDone = '1' THEN            -- If 1st byte has been successfully transmitted
+          nextState <= TRANSMIT_BYTE_2; -- Go to 'TRANSMIT_BYTE_2' state to transmit 2nd byte
         END IF;
      
-      WHEN TRANSMIT_BYTE_2 =>  -- State Transmits the 2nd byte
-        IF txDone = '1' THEN
-          nextState <= TRANSMIT_BYTE_2;
-        ELSIF txDone = '0' THEN
-          nextState <= SPACE;
+      WHEN TRANSMIT_BYTE_2 =>           -- State Transmits the 2nd byte
+        IF txDone = '1' THEN            -- If txDone is still high 
+          nextState <= TRANSMIT_BYTE_2; -- Remain in 'TRANSMIT_BYTE_2' state 
+        ELSIF txDone = '0' THEN         -- If txDone is low and the 2nd byte has been transmitted 
+          nextState <= SPACE;           -- Go to 'SPACE' state to add a space before transmitting the next byte 
         END IF;
        
       WHEN SPACE =>               -- State adds spaces between bytes transmitted  
