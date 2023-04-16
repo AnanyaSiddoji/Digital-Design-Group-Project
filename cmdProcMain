@@ -102,7 +102,7 @@ END PROCESS;
  
 -----------------------------------------------------
 -- TRANSMISSION FUNCTION
-transmitOut: PROCESS (en_echo,curState, rxData_reg,byteOut1,byteOut2, clk)
+transmitOut: PROCESS (en_echo,curState, rxData_reg,byteOut1,byteOut2, clk, Count)
 BEGIN
   IF clk'EVENT AND clk = '1' THEN
     IF txDone = '0' THEN -- If txDone is low
@@ -310,10 +310,9 @@ END PROCESS;
     n2 <= "00000000";
     n3 <= "00000000";
     Res <= "00000000";
+    nextState <= INIT;
 
-    FOR I IN 0 TO 19 LOOP
-      L_array(I) <= X"00"; 
-    END LOOP;
+
     
 
    
