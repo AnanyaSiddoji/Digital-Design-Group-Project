@@ -59,6 +59,7 @@ ARCHITECTURE command OF cmdProc IS
  -- PROCESS byteToHex
  SIGNAL byte1, byte2: integer range 0 to 15;
  SIGNAL byteOut1, byteOut2: std_logic_vector(7 DOWNTO 0);
+
  -- PROCESS dataResToHex
  SIGNAL Res: std_logic_vector(7 DOWNTO 0);
  SIGNAL data1, data2: integer range 0 to 15;
@@ -79,7 +80,7 @@ BEGIN
       curState <= nextState;
     END IF;
   END PROCESS;
-
+ 
   data_register: PROCESS (clk, rxData, en_dataReg)
   BEGIN
     IF clk'EVENT AND clk = '1' THEN
@@ -101,12 +102,11 @@ END PROCESS;
  
 -----------------------------------------------------
 -- TRANSMISSION FUNCTION
-transmitOut: PROCESS (en_echo,curState, rxData_reg,byteOut1,byteOut2, Count,clk)
+transmitOut: PROCESS (en_echo,curState, rxData_reg,byteOut1,byteOut2, clk)
 BEGIN
   IF clk'EVENT AND clk = '1' THEN
     IF txDone = '0' THEN -- If txDone is low
       txNow <= '0';      -- No transmission occurs
-   
     ELSIF txDone = '1' THEN  -- If txDone is High
       txnow <= '1';          -- Data gets transmitted if it meets the 'IF conditions' below
       IF en_echo = '1' THEN  -- Responsible for Echoing Data to user
@@ -123,7 +123,6 @@ BEGIN
         txData <= byteOut1;
       ELSIF curState = TRANSMIT_BYTE_2 THEN                     -- Transmits the 2nd part of the Byte
         txData <= byteOut2;
-     
       ELSE            -- If none of the 'IF conditions' are met
         txNow <= '0'; -- No transmission occurs
       END IF;
@@ -140,12 +139,16 @@ BEGIN
     byteOut1 <= std_logic_vector(to_unsigned(byte1 + 48,8)); -- Coverts the number to ASCII format
   ELSIF (byte1 >= 10) AND (byte1 <= 15) THEN                 -- Checks if the 1st part of the value is A,B,C,D,or F
     byteOut1 <= std_logic_vector(to_unsigned(byte1 + 55,8)); -- Coverts A,B,C,D,or F to their ASCII format
+  ELSE 
+    byteOut1 <= "00000000";
   END IF;
 
   IF (byte2 >= 0) AND (byte2 <= 9) THEN                      -- Checks if the 2nd part of the value is a number
     byteOut2 <= std_logic_vector(to_unsigned(byte2 + 48,8)); -- Coverts the number to ASCII format
   ELSIF (byte2 >= 10) AND (byte2 <= 15) THEN                 -- Checks if the 2nd part of the value is A,B,C,D,or F
     byteOut2 <= std_logic_vector(to_unsigned(byte2 + 55,8)); -- Coverts A,B,C,D,or F to their ASCII format
+  ELSE 
+    byteOut2 <= "00000000";
   END IF;
  
 END PROCESS;
@@ -156,23 +159,23 @@ END PROCESS;
 dataResToHex: PROCESS(dataResults_reg, lCounter, Res, data1, data2)
 BEGIN    
   IF lCounter /= 0 THEN
-    L_array((3*lCounter)-1) <= X"20";                                   -- Adds spaces between every value from dataResults in the array
-  ELSE 
-    FOR I IN 0 TO 19 LOOP 
-        L_array(I) <= X"00";
-     END LOOP;
+    L_array((3*lCounter)-1) <= X"20";                                  -- Adds spaces between every value from dataResults in the array
   END IF;
  
   IF ((data1 >= 0) AND (data1 <= 9)) THEN                               -- Checks if the 1st part of the value is a number
     L_array(3*lCounter) <= std_logic_vector(to_unsigned(data1 + 48,8)); -- Coverts the number to ASCII format and assigns it to L_array as an 8 bit logic vector
   ELSIF ((data1 >= 10) AND (data1 <= 15)) THEN                          -- Checks if the 1st part of the value is A,B,C,D,or F
     L_array(3*lCounter) <= std_logic_vector(to_unsigned(data1 + 55,8)); -- Coverts A,B,C,D,or F to their ASCII format & assigns it to L_array as an 8 bit logic vector
+  ELSE 
+     L_array(3*lCounter) <= X"00";
   END IF;
  
   IF ((data2 >= 0) AND (data2 <= 9)) THEN                                 -- Checks if the 2nd part of the value is a number
     L_array(3*lCounter+1) <= std_logic_vector(to_unsigned(data2 + 48,8)); -- Coverts the number to ASCII format and assigns it to L_array as an 8 bit logic vector
   ELSIF ((data2 >= 10) AND (data2 <= 15)) THEN                            -- Checks if the 2nd part of the value is A,B,C,D,or F
     L_array(3*lCounter+1) <= std_logic_vector(to_unsigned(data2 + 55,8)); -- Coverts A,B,C,D,or F to their ASCII format & assigns it to L_array as an 8 bit logic vector
+  ELSE 
+    L_array(3*lCounter+1) <= X"00";
   END IF;
 
 END PROCESS;
@@ -206,7 +209,7 @@ BEGIN
 END PROCESS;
 
 -----------------------------------------------------
-NNN_CHECK: PROCESS(Count, n1, n2, n3, clk, num1,num2,num3)
+NNN_CHECK: PROCESS(Count, n1, n2, n3, clk,num1,num2,num3)
 BEGIN
   IF n1(7 DOWNTO 4) = "0011" THEN                 -- Checks if the 1st N is a number
     num1 <= to_integer(unsigned(n1(3 DOWNTO 0))); -- Converts logic vector to integer to use arithmetic and check number validity
@@ -215,8 +218,17 @@ BEGIN
       BOOL_N1 <= TRUE;                            -- If the 1st N is a number it assigns TRUE for BOOL_N1
     ELSE                                          -- If the 1st N is not a number
       BOOL_N1 <= FALSE;                           -- It assigns FALSE for BOOL_N1
-      numWords_bcd(2) <= "0000";                  -- Assigns number 0 in BCD to array
+      numWords_bcd(2) <= "0000";
+      numWords_bcd(1) <= "0000";
+      numWords_bcd(0) <= "0000";                    -- Assigns number 0 in BCD to array
     END IF;
+  ELSE 
+    NNN <= 0;
+    BOOL_N1 <= FALSE;
+    num1 <= 0;
+    numWords_bcd(2) <= "0000";
+    numWords_bcd(1) <= "0000";
+    numWords_bcd(0) <= "0000";  
   END IF;
      
   IF n2(7 DOWNTO 4) = "0011" THEN                 -- Checks if the 2nd N is a number
@@ -227,8 +239,16 @@ BEGIN
     ELSE                                          -- If the 2nd N is not a number
       BOOL_N2 <= FALSE;                           -- It assigns FALSE for BOOL_N2
       numWords_bcd(2) <= "0000";
-      numWords_bcd(1) <= "0000";                  -- Assigns number 0 in BCD to array
+      numWords_bcd(1) <= "0000";
+      numWords_bcd(0) <= "0000";                   -- Assigns number 0 in BCD to array
     END IF;
+  ELSE 
+    NNN <= 0;
+    BOOL_N2 <= FALSE;
+    num2 <= 0;
+    numWords_bcd(2) <= "0000";
+    numWords_bcd(1) <= "0000";
+    numWords_bcd(0) <= "0000";  
   END IF;
          
   IF n3(7 DOWNTO 4) = "0011" THEN                 -- Checks if the 3rd N is a number
@@ -237,12 +257,19 @@ BEGIN
       numWords_bcd(0) <= n3(3 DOWNTO 0);          -- Assigns the 2nd half as its in BCD format to numWords_bcd array
       BOOL_N3 <= TRUE;                            -- If the 3rd N is a number it assigns TRUE for BOOL_N3
       NNN <= (num1*100) + (num2*10) + (num3);     -- Positioning all digits (N1,N2,& N3)to the right decimal point  
-    ELSE                                          -- If the 3rd N is not a number
+    ELSE                                        -- If the 3rd N is not a number
       BOOL_N3 <= FALSE;                           -- It assigns FALSE for BOOL_N3
       numWords_bcd(2) <= "0000";
       numWords_bcd(1) <= "0000";
       numWords_bcd(0) <= "0000";                  -- Assigns number 0 in BCD to array
     END IF;
+  ELSE 
+     NNN <= 0;
+     BOOL_N3 <= FALSE;
+     num3 <= 0;
+     numWords_bcd(2) <= "0000";
+     numWords_bcd(1) <= "0000";
+     numWords_bcd(0) <= "0000";  
   END IF;
  
 END PROCESS;
@@ -262,8 +289,7 @@ END PROCESS;
 
 -----------------------------------------------------
   -- NEXT STATE LOGIC
-  nextStateLogic: PROCESS(curState, rxData_reg, rxNow, txDone, BOOL_N1, BOOL_N2, BOOL_N3, 
-  byte,dataReady,dataReg,Count,NNN,rxData,dataResults_reg,lCounter,Res,byte)
+  nextStateLogic: PROCESS(curState, rxData_reg, rxNow, txDone, BOOL_N1, BOOL_N2, BOOL_N3, byte,dataReady, dataReg, Count,rxData, dataResults_reg,lCounter,Res,NNN)
   BEGIN
      -- Assign default values
     start  <= '0';
@@ -275,6 +301,21 @@ END PROCESS;
     res_lCounter <= '0';
     en_count <= '0';
     res_count <= '0';
+    
+    byte1 <= 0;
+    byte2 <= 0;
+    data1 <= 0;
+    data2 <= 0;
+    n1 <= "00000000";
+    n2 <= "00000000";
+    n3 <= "00000000";
+    Res <= "00000000";
+
+    FOR I IN 0 TO 19 LOOP
+      L_array(I) <= X"00"; 
+    END LOOP;
+    
+
    
     CASE curState IS
  
