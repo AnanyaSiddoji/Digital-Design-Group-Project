@@ -101,7 +101,7 @@ END PROCESS;
  
 -----------------------------------------------------
 -- TRANSMISSION FUNCTION
-transmitOut: PROCESS (en_echo,curState, rxData_reg,byteOut1,byteOut2, clk)
+transmitOut: PROCESS (en_echo,curState, rxData_reg,byteOut1,byteOut2, Count,clk)
 BEGIN
   IF clk'EVENT AND clk = '1' THEN
     IF txDone = '0' THEN -- If txDone is low
@@ -157,6 +157,10 @@ dataResToHex: PROCESS(dataResults_reg, lCounter, Res, data1, data2)
 BEGIN    
   IF lCounter /= 0 THEN
     L_array((3*lCounter)-1) <= X"20";                                   -- Adds spaces between every value from dataResults in the array
+  ELSE 
+    FOR I IN 0 TO 19 LOOP 
+        L_array(I) <= X"00";
+     END LOOP;
   END IF;
  
   IF ((data1 >= 0) AND (data1 <= 9)) THEN                               -- Checks if the 1st part of the value is a number
@@ -202,7 +206,7 @@ BEGIN
 END PROCESS;
 
 -----------------------------------------------------
-NNN_CHECK: PROCESS(Count, n1, n2, n3, clk)
+NNN_CHECK: PROCESS(Count, n1, n2, n3, clk, num1,num2,num3)
 BEGIN
   IF n1(7 DOWNTO 4) = "0011" THEN                 -- Checks if the 1st N is a number
     num1 <= to_integer(unsigned(n1(3 DOWNTO 0))); -- Converts logic vector to integer to use arithmetic and check number validity
@@ -258,7 +262,8 @@ END PROCESS;
 
 -----------------------------------------------------
   -- NEXT STATE LOGIC
-  nextStateLogic: PROCESS(curState, rxData_reg, rxNow, txDone, BOOL_N1, BOOL_N2, BOOL_N3, byte,dataReady)
+  nextStateLogic: PROCESS(curState, rxData_reg, rxNow, txDone, BOOL_N1, BOOL_N2, BOOL_N3, 
+  byte,dataReady,dataReg,Count,NNN,rxData,dataResults_reg,lCounter,Res,byte)
   BEGIN
      -- Assign default values
     start  <= '0';
