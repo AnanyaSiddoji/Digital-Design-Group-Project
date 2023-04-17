@@ -163,7 +163,7 @@ case currentState IS
 	dataReady <= '1';
 	byte <= byteReg(3);
  when SEQ_DONE =>
- --Tells the Command Processor all bytes processed and peak found
+ --Tells the Command Processor that peak is found
     seqDone <= '1';
     dataResults<=dataReg;
     maxIndex <= maxIndexReg;
@@ -175,7 +175,7 @@ case currentState IS
 end process;
 
              
-StateRegister:	process (clk, reset)
+StateRegister:	process (clk)
 begin
 		if rising_edge (clk) then
 			if (reset = '1') then
@@ -401,6 +401,8 @@ ctrlInDetected <= ctrlIn xor ctrlInDelayed;
 --Output to dataGen
 ctrlOut <= ctrlOutReg;
 --Sends input to be converted to integer
-numWords<=numWords_Bcd;
-
+numWords<=numWords_bcd;
+maxIndex <= maxIndexReg;
+byte <= STD_LOGIC_VECTOR(byteReg);
+dataResults<=dataReg;
 end behav;
