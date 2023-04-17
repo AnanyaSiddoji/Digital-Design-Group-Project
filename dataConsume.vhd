@@ -402,7 +402,5 @@ ctrlInDetected <= ctrlIn xor ctrlInDelayed;
 ctrlOut <= ctrlOutReg;
 --Sends input to be converted to integer
 numWords<=numWords_bcd;
-maxIndex <= maxIndexReg;
-byte <= STD_LOGIC_VECTOR(byteReg);
-dataResults<=dataReg;
+
 end behav;
