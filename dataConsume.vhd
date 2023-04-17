@@ -175,7 +175,7 @@ case currentState IS
 end process;
 
              
-StateRegister:	process (clk)
+StateRegister:	process (clk, reset)
 begin
 		if rising_edge (clk) then
 			if (reset = '1') then
