@@ -224,10 +224,10 @@ if rising_edge(clk) then
     dataReg(i) <= (others => '0');
     end loop;
     else 
-        if loadToLeft = '1' then 
+         if loadToLeft = '1' then 
         dataReg(0 to 3) <= byteReg;
         elsif loadToRight ='1' then 
-            dataReg(4 to 6) <= byteReg(1 to 3);
+        dataReg(4 to 6) <= byteReg(1 to 3);
         elsif resetRegister = '1' then 
             for l in 0 to 6 loop
             dataReg(l) <= (others => '0');
@@ -248,7 +248,7 @@ loadToRight<='0';
         if PeakFound ='1' then 
             enablePeakCount <= '1';
          else 
-            if PeakCount = 2 then
+            if PeakCount = 3 then
                 loadToRight<='1';
                 enablePeakCount<='0';
                 ResetPeakCount <= '1';
@@ -258,65 +258,3 @@ loadToRight<='0';
        end if;
       end if;
 end process;
-
-
-DataCounter: process(clk) 
-begin 
-if rising_edge(clk) then
-    if reset = '1' or PeakFound = '1' then 
-        PeakCount<=0;
-     else  
-        if ResetPeakCount = '1' then 
-            peakCount<=0;
-        else
-            if enablePeakCount = '1' then 
-                if currentState = GET_DATA then 
-                    PeakCount<=PeakCount+1;
-                end if;
-        end if;
-        end if;
-     end if;
- end if;
-end process;   
-     
-     
-Comparator: process(byteReg,dataReg,reset) 
-begin
-loadToLeft<='0';
-PeakFound <= '0';
-if TO_INTEGER(unsigned(byteReg(3))) > TO_INTEGER(unsigned(dataReg(3))) then 
-    PeakFound <= '1';
-    loadToLeft<='1';
-end if;
-end process;
-
-
-Peak_index: process(clk)
-begin
-if rising_edge(clk) then 
-    if reset = '1' then 
-    for m in 0 to 2 loop
-        maxIndexReg(m)<= (others=>'0');
-    end loop;
-    else    
-        if PeakFound = '1' then 
-            maxIndexReg(2) <= std_logic_vector(TO_UNSIGNED(((byteCount-1)/100),4));
-            maxIndexReg(1) <= std_logic_vector(TO_UNSIGNED((((byteCount-1) mod 100)/10),4));
-            maxIndexReg(0) <= std_logic_vector(TO_UNSIGNED(((byteCount-1) mod 10),4));
-         end if;
-   end if;
- end if;
-end process;
-       
-
-
-
-  
---High of CtrlIn changes
-ctrlIndetected <= ctrlIn xor ctrlIndelayed;
---Output to dataGen
-ctrlOut <= ctrlOutReg;
---Sends input to be converted to integer
-numWords<=numwords_bcd;
-
-end behav;
