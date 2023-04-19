@@ -1,139 +1,71 @@
-LIBRARY ieee;
-USE IEEE.std_logic_1164.ALL;
-USE IEEE.std_logic_unsigned.ALL;
-USE work.common_pack.ALL;
-USE IEEE.numeric_std.ALL;
--- Uncomment the following library declaration if instantiating
--- any Xilinx leaf cells in this code.
---library UNISIM;
---use UNISIM.VComponents.all;
-------------------------------------------------------
-ENTITY dataConsume is
-Port (
-	clk:	in std_logic;
-	reset:	in std_logic; -- synchronous reset
-	start:	in std_logic; -- goes high to signal data transfer
-	numWords_bcd	:in BCD_ARRAY_TYPE(2 downto 0);
-  	ctrlIn: in std_logic;
-  	ctrlOut: out std_logic;
- 	data: in std_logic_vector(7 downto 0);
-  	dataReady:   	out std_logic;
-  	byte:	        out std_logic_vector(7 downto 0);
-  	seqDone:     	out std_logic;
-  	maxIndex:	out BCD_ARRAY_TYPE(2 downto 0);
-  	dataResults: 	out CHAR_ARRAY_TYPE(0 to RESULT_BYTE_NUM-1) -- index 3 holds the peak  
-);
-end;
----------------------------------------------------------
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use work.common_pack.all;
+use IEEE.NUMERIC_STD.ALL;
+library UNISIM;
+use UNISIM.VComponents.all;
+
+entity dataConsume is
+    Port (
+        clk:		  in std_logic;
+		reset:		  in std_logic; -- synchronous reset
+		start:        in std_logic; -- goes high to signal data transfer
+		numWords_bcd: in BCD_ARRAY_TYPE(2 downto 0);
+		ctrlIn:       in std_logic;
+		ctrlOut:      out std_logic;
+		data:         in std_logic_vector(7 downto 0);
+		dataReady:    out std_logic;
+		byte:         out std_logic_vector(7 downto 0);
+		seqDone:      out std_logic;
+		maxIndex:     out BCD_ARRAY_TYPE(2 downto 0);
+		dataResults:  out CHAR_ARRAY_TYPE(0 to RESULT_BYTE_NUM-1) -- index 3 holds the peak
+    );
+end dataConsume;
+
 architecture behav of dataConsume is
-	type state_type is (IDLE,FETCH,WAIT_DATA,DATA_READY,GET_DATA,SEQ_DONE);
-	signal currentstate,nextstate : state_type;
-	signal dataReg: CHAR_ARRAY_TYPE(0 to 6);
-	signal maxIndexReg: BCD_ARRAY_TYPE(2 downto 0);
-	signal byteReg: CHAR_ARRAY_TYPE(0 to 3);
-	signal ctrlInDelayed, ctrlInDetected, ctrlOutReg,numWordCount,PeakFound,enablePeakCount,ResetPeakCount,resetShifter,resetRegister,loadToLeft,loadToRight: std_logic;
-	signal numWords: BCD_ARRAY_TYPE(2 downto 0);
-	signal IntegerNumWords,bytecount: integer range 0 to 999;
-	signal PeakCount: integer range 0 to 4;
-	signal signal_ctrlIn, signal_ctrlOut :std_logic;
-
-
---------------------------------------------------------------------------------------------------------
---begin 
---nextState: Process(clk) --this is draft
---begin
---	if rising_edge(clk) then 
---		if reset = '1' then
---			ctrlOut <= '0' then
---			state <= s0;
---		else
---			
---	case curState is 
---		when s0 =>
---			if start = '1' then
---				nextState <= s1;
---			else
---				nextState <= s0;
---			end if;
---		when s1 =>
---			if ctrl1 = '1' then
---				nextState <= s2;
---			else
---				nextState <= s1;		
---			end if;
---		when s2 =>
---			ctrl1 <= '0';
---			if ctrl2 = '1' then
---				nextState <= s3;
---			else
---				nextState <= s2;
---			end if;		
---		when s3 =>
---			if counter = numWords then
---				nextState <= s4;
---			elsif counter < numWords 
---				nextState <= s0;
---			else 
---				err;
---			end if;			
---		when s4 =>
---			seqDone = '1';
---			 
-
---end process;
-------------------------------------------------------------------
---buffer_reg: process (clk, reset) -- i was about to implement buffer register beforehand
---begin
---	if reset = '1' then
---		dataResult_buffer_register <= (others => '0');
---	elsif rising_edge(clk) then 
---		dataResult_buffer_register(2 downto 0) <= "00000000";
---	end if;
---end process;	
-
--------------------------------------------------------------------
---dataReg: process (clk, reset)
---begin
---	if reset = '1' then
---		dataResult  <= (others => '0');
---	elsif rising_edge(clk) then 
---		dataResult_buffer_register(2 downto 0) <= "00000000";
---	end if;
---end process;	
-
----STATES-------------------------------------------------------------------------------
+    type state_type is (IDLE,FETCH,WAIT_DATA,DATA_READY,GET_DATA,SEQ_DONE);
+    signal currentstate,nextstate : state_type;
+    signal dataReg: CHAR_ARRAY_TYPE(0 to 6);
+    signal maxIndexReg: BCD_ARRAY_TYPE(2 downto 0);
+    signal byteReg: CHAR_ARRAY_TYPE(0 to 3);
+    signal ctrlInDelayed, ctrlInDetected, ctrlOutReg,numWordCount,PeakFound,enablePeakCount,ResetPeakCount,resetShifter,resetRegister,loadToLeft,loadToRight: std_logic;
+    signal numWords: BCD_ARRAY_TYPE(2 downto 0);
+    signal IntegerNumWords,bytecount: integer range 0 to 999;
+    signal PeakCount: integer range 0 to 4;
+    
 begin
+
+-----------------------------------------------------------------------------------------
+--STATE PROCESSES
+
 StateChange: process(currentState,start,ctrlInDetected,numWordCount) 
 begin
 resetShifter<='0';
 resetRegister<='0';
-	 -- assign as default
+	 -- assign defaults at the beginning to avoid assigning in every branch
     case currentState is
         
         when IDLE => 
-        resetShifter<='1';
-        resetRegister<='1';
-            if start = '1' then
+        --resetShifter<='1';
+        --resetRegister<='1';
+            if start = '1' then --Start two phase protocol
                 nextState <= FETCH;
-            else 
+            else --Wait for start = 1
                 nextState <= IDLE;
             end if;            
             
-        
-        when GET_DATA =>
-            nextState <= DATA_READY;
-
-	when FETCH =>
+        when FETCH => --Change CtrlOut and proceed to wait for change in CtrlIn
         nextState <= WAIT_DATA;         
         
         when WAIT_DATA => 
-            if ctrlInDetected <= '1' then
+            if ctrlInDetected <= '1' then  --Data on btye line is valid
                 nextState <= GET_DATA;
-            else 
-            --Wait for change in CtrlIn
+            else    --Wait for change in CtrlIn
                 nextState <= WAIT_DATA;
             end if;           
             
+        when GET_DATA =>
+            nextState <= DATA_READY;
                         
         when DATA_READY =>
         if numWordcount = '1' then 
@@ -142,6 +74,7 @@ resetRegister<='0';
             --Requests another byte
                 nextState <= FETCH; 
             else 
+            --Halts data retrieval while Command Processor communicates with PC
                 nextState <= DATA_READY;
             end if;
                        
@@ -156,14 +89,15 @@ resetRegister<='0';
 end process;
 
 
-StateOutput:	process (currentState)
+StateOutputs:	process (currentState)
 begin 
 case currentState IS
  when DATA_READY => 
+ --Update output lines, signal data is valid 
 	dataReady <= '1';
 	byte <= byteReg(3);
  when SEQ_DONE =>
- --Tells the Command Processor that peak is found
+ --Tell Command Processor all bytes processed and peak found
     seqDone <= '1';
     dataResults<=dataReg;
     maxIndex <= maxIndexReg;
@@ -174,8 +108,8 @@ case currentState IS
 
 end process;
 
-             
-StateRegister:	process (clk, reset)
+
+StateRegister:	process (clk)
 begin
 		if rising_edge (clk) then
 			if (reset = '1') then
@@ -188,100 +122,79 @@ end process;
 
 -------------------------------------------------------------------------------------
 --DATA RETRIEVAL 
-
 ----RequestData--- handshaking protocal here. if rising clock edge then reset and ctrl out register is set to 0 else if state is fetch
 ----ctrl out register <= not ctrl out reg else goes to ctrl out regisiter
-DataRequest: process(clk, reset)
-begin
-    if rising_edge(clk) then
+RequestData: process(clk)
+Begin
+    if rising_edge(clk) then 
         if reset='1' then
-            ctrlOutReg <= '0';
+            ctrlOutReg<='0';
         else
             if currentState = FETCH then
+            --Chane on CtrlOut to start hand-shaking protocol
                 ctrlOutReg <= not ctrlOutReg;
-            else 
-                ctrlOutReg <= ctrlOutReg;
+            else
+            --No change in CtrlOut
+                ctrlOutReg<= ctrlOutReg;
+            
             end if;
-         end if;
-     end if;
+        end if;
+end if;
 end process;
---        if rising_edge(clk) then
---		signal_ctrlIn <= ctrlIn;
---		--signal_ctrlOut <= ctrlOut;
---            case currentState is
- --               when IDLE =>
---                    if signal_ctrlOut = '1' then
---                        currentState <= FETCH;
---                        signal_ctrlIn <= '1';
---                    else
---                        currentState <= IDLE;
---                        signal_ctrlIn <= '0';
---                    end if;
---                when FETCH =>
---                    currentState <= WAIT_DATA;
---                    signal_ctrlIn <= '0';
- --               when WAIT_DATA =>
---                    if signal_ctrlOut = '0' then
---                        currentState <= IDLE;
---                        signal_ctrlIn <= '0';
- --                   else
---                        currentState <= WAIT_DATA;
---                        signal_ctrlIn <= '0';
---                    end if;
---            end case;
- --       end if;
- --   end process;
 
----Delay CtrlIn -- if clock is no rising edge then ctrlInDelayed <= ctrlIn
-ctrlInDelay: process(clk)
+
+Delay_CtrlIn: process(clk)     
+begin
+    if rising_edge(clk) then
+    --Used in XOR to detect a change in CtrlIn
+      ctrlIndelayed <= ctrlIn;
+    end if;
+end process;  
+
+
+NumWordsToInteger: process(numwords)
+Begin
+--Convert BCD to Integer
+IntegerNumWords<=100*TO_INTEGER(unsigned(numwords(2)))+10*TO_INTEGER(unsigned(numwords(1)))+TO_INTEGER(unsigned(numwords(0)));
+end process;
+
+
+ByteCounter : process (clk)
 begin
 	if rising_edge(clk) then
-		ctrlInDelayed <= ctrlIn;
-	end if;
-end process;
-
-
----numWords in integer form--- convert BCD to Integer
-BCD_to_binary: process(numWords_bcd)
-variable sum: std_logic_vector(10 downto 0);
-variable n1, n2: unsigned(10 downto 0);
-begin
-        --n1 := "0001010" * unsigned(numWords_bcd(1)); -- first BCD digit multiplied by 100
-        --n2 := "1100100" * unsigned(numWords_bcd(2)); -- second BCD digit multiplied by 10
-        --sum := std_logic_vector(unsigned(numWords_bcd(0)) + n1 + n2);
-        --IntegerNumWords <= sum(9 downto 0); 
-
-        IntegerNumWords<= 100*TO_INTEGER (unsigned(numwords(2)))+10*TO_INTEGER(unsigned(numwords(1)))+TO_INTEGER(unsigned(numWords(0)));
-    end process;   
-
----ByteCounter -- if clock is on rising edge and if reset is 1 then reset byte counter else if byte count = number of words reset counter
-------------------else if the curret state is retreicing data then add one to byte count or wait for new byte (byte count remains same)
-ByteCounter: process(clk)
-begin
-	if rising_edge(clk) AND reset = '1' then
-		byteCount <= 0;
-	else 
-		if (byteCount = IntegerNumWords) then
+		if reset ='1' then
+		--Reset counter
 			byteCount <= 0;
-		elsif currentState = GET_DATA then
-			byteCount <= byteCount + 1;
-		else
-			byteCount <= byteCount;
+		else 	
+		    if (byteCount = IntegerNumWords) then
+		    --Reset counter
+		      byteCount <= 0;
+		     elsif currentState = GET_DATA then
+		     --New valid byte received
+				    byteCount <= byteCount + 1;
+				else 
+				--Wait for new byte
+				    byteCount <= byteCount;
+				end if;
+			end if;
 		end if;
-	end if;
 end process;
 
----SequenceFINSIHED - checking if byte number = numebr of words and setting WordCound to 1 if so or 0 if not.
-SequenceFin: process(IntegerNumWords, byteCount)
-begin
-	if (byteCount = IntegerNumWords) then
-		numWordCount <= '1';
-	else 
-		numWordCount <= '0';
-	end if;
+
+SequenceComplete: process(byteCount,IntegerNumWords)
+begin 
+ if (bytecount = IntegerNumWords) then 
+ --Byte Number = NumWords
+            numWordCount <= '1';
+     else 
+     --Byte Number /= NumWords
+        numWordCount <= '0';
+end if;
+
 end process;
+
 --------------------------------------------------------------------------------------------
---MY PEAK DETECTION PART
+--PEAK DETECTION PROCESSES
 
 dataShift: process(clk)
 begin
@@ -300,7 +213,7 @@ if rising_edge(clk) then
         end if;
     end if;
 end if;
-end process; 
+end process;
 
 
 dataLatch: process(clk)
@@ -330,17 +243,17 @@ begin
 loadToRight<='0';
     if reset = '1' then 
         enablePeakCount <= '0';
-        resetPeakCount <= '0';
+        ResetPeakCount <= '0';
     else    
         if PeakFound ='1' then 
             enablePeakCount <= '1';
          else 
-            if PeakCount = 3 then
-                loadToRight <='1';
+            if PeakCount = 2 then
+                loadToRight<='1';
                 enablePeakCount<='0';
-             	resetPeakCount<= '1';
+                ResetPeakCount <= '1';
             else
-                resetPeakCount<='0';
+                ResetPeakCount<='0';
             end if;
        end if;
       end if;
@@ -353,7 +266,7 @@ if rising_edge(clk) then
     if reset = '1' or PeakFound = '1' then 
         PeakCount<=0;
      else  
-        if resetPeakCount = '1' then 
+        if ResetPeakCount = '1' then 
             peakCount<=0;
         else
             if enablePeakCount = '1' then 
@@ -370,9 +283,9 @@ end process;
 Comparator: process(byteReg,dataReg,reset) 
 begin
 loadToLeft<='0';
-Peakfound <= '0';
+PeakFound <= '0';
 if TO_INTEGER(unsigned(byteReg(3))) > TO_INTEGER(unsigned(dataReg(3))) then 
-    Peakfound <= '1';
+    PeakFound <= '1';
     loadToLeft<='1';
 end if;
 end process;
@@ -387,20 +300,23 @@ if rising_edge(clk) then
     end loop;
     else    
         if PeakFound = '1' then 
-            MaxIndexReg(2) <= std_logic_vector(TO_UNSIGNED(((byteCount-1)/100),4));
-            MaxIndexReg(1) <= std_logic_vector(TO_UNSIGNED((((byteCount-1) mod 100)/10),4));
-            MaxIndexReg(0) <= std_logic_vector(TO_UNSIGNED(((byteCount-1) mod 10),4));
+            maxIndexReg(2) <= std_logic_vector(TO_UNSIGNED(((byteCount-1)/100),4));
+            maxIndexReg(1) <= std_logic_vector(TO_UNSIGNED((((byteCount-1) mod 100)/10),4));
+            maxIndexReg(0) <= std_logic_vector(TO_UNSIGNED(((byteCount-1) mod 10),4));
          end if;
    end if;
  end if;
 end process;
        
+
+
+
   
 --High of CtrlIn changes
-ctrlInDetected <= ctrlIn xor ctrlInDelayed;
+ctrlIndetected <= ctrlIn xor ctrlIndelayed;
 --Output to dataGen
 ctrlOut <= ctrlOutReg;
 --Sends input to be converted to integer
-numWords<=numWords_bcd;
+numWords<=numwords_bcd;
 
 end behav;
