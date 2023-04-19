@@ -258,3 +258,65 @@ loadToRight<='0';
        end if;
       end if;
 end process;
+
+
+DataCounter: process(clk) 
+begin 
+if rising_edge(clk) then
+    if reset = '1' or PeakFound = '1' then 
+        PeakCount<=0;
+     else  
+        if ResetPeakCount = '1' then 
+            peakCount<=0;
+        else
+            if enablePeakCount = '1' then 
+                if currentState = GET_DATA then 
+                    PeakCount<=PeakCount+1;
+                end if;
+        end if;
+        end if;
+     end if;
+ end if;
+end process;   
+     
+     
+Comparator: process(byteReg,dataReg,reset) 
+begin
+loadToLeft<='0';
+PeakFound <= '0';
+if TO_INTEGER(unsigned(byteReg(3))) > TO_INTEGER(unsigned(dataReg(3))) then 
+    PeakFound <= '1';
+    loadToLeft<='1';
+end if;
+end process;
+
+
+Peak_index: process(clk)
+begin
+if rising_edge(clk) then 
+    if reset = '1' then 
+    for m in 0 to 2 loop
+        maxIndexReg(m)<= (others=>'0');
+    end loop;
+    else    
+        if PeakFound = '1' then 
+            maxIndexReg(2) <= std_logic_vector(TO_UNSIGNED(((byteCount-1)/100),4));
+            maxIndexReg(1) <= std_logic_vector(TO_UNSIGNED((((byteCount-1) mod 100)/10),4));
+            maxIndexReg(0) <= std_logic_vector(TO_UNSIGNED(((byteCount-1) mod 10),4));
+         end if;
+   end if;
+ end if;
+end process;
+       
+
+
+
+  
+--High of CtrlIn changes
+ctrlIndetected <= ctrlIn xor ctrlIndelayed;
+--Output to dataGen
+ctrlOut <= ctrlOutReg;
+--Sends input to be converted to integer
+numWords<=numwords_bcd;
+
+end behav;
