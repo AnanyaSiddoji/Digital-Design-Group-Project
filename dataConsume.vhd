@@ -36,16 +36,16 @@ architecture behav of dataConsume is
 begin
 
 -----------------------------------------------------------------------------------------
---STATE PROCESSES
+--STATE PROCESSES--
 
 StateChange: process(currentState,start,ctrlInDetected,numWordCount) 
 begin
 resetShifter<='0';
 resetRegister<='0';
-	 -- assign defaults at the beginning to avoid assigning in every branch
+	 -- assigning defaults at the beginning to avoid assigning in every branch
     case currentState is
         
-        when IDLE => 
+        when IDLE => --sent back here when resetting
         --resetShifter<='1';
         --resetRegister<='1';
             if start = '1' then --Start two phase protocol
@@ -54,11 +54,11 @@ resetRegister<='0';
                 nextState <= IDLE;
             end if;            
             
-        when FETCH => --Change CtrlOut and proceed to wait for change in CtrlIn
+        when FETCH => 
         nextState <= WAIT_DATA;         
         
         when WAIT_DATA => 
-            if ctrlInDetected <= '1' then  --Data on btye line is valid
+            if ctrlInDetected <= '1' then
                 nextState <= GET_DATA;
             else    --Wait for change in CtrlIn
                 nextState <= WAIT_DATA;
@@ -103,8 +103,7 @@ case currentState IS
  when SEQ_DONE =>
  --Tell Command Processor all bytes processed and peak found
     seqDone <= '1';
-    --dataReg(3)<= '00';
-    
+   --dataReg(3)<= '00'; --did not work
    -- byteCount <= 0;
     dataResults<=dataReg;
     maxIndex <= maxIndexReg;
@@ -154,7 +153,6 @@ end process;
 Delay_CtrlIn: process(clk)     
 begin
     if rising_edge(clk) then
-    --Used in XOR to detect a change in CtrlIn
       ctrlIndelayed <= ctrlIn;
     end if;
 end process;  
@@ -204,7 +202,7 @@ end process;
 --------------------------------------------------------------------------------------------
 --PEAK DETECTION PROCESSES
 
-dataShift: process(clk)
+dataShift: process(clk) --used to update byte register 
 begin
 if rising_edge(clk) then  
    if reset = '1' then
@@ -224,19 +222,19 @@ end if;
 end process;
 
 
-dataLatch: process(clk)
+dataLatch: process(clk) --used to place value in byte register into data Register
 begin
 if rising_edge(clk) then  
-   if reset = '1' then
+   if reset = '1' then --reset loop
    for i in 0 to 6 loop
     dataReg(i) <= (others => '0');
     end loop;
     else 
-         if loadToLeft = '1' then 
-        dataReg(0 to 3) <= byteReg;
+         if loadToLeft = '1' then --starts loop to load the values of byte reg into data reg
+        dataReg(0 to 3) <= byteReg; --0 to 3 so on left had side with 3 being middle peak value
         elsif loadToRight ='1' then 
-        dataReg(4 to 6) <= byteReg(1 to 3);
-        elsif resetRegister = '1' then 
+        dataReg(4 to 6) <= byteReg(1 to 3); -- 4 to 6 o on right hand side, 1 to 3 needed here so correct values are copied over
+        elsif resetRegister = '1' then --reset register loop - add reset register to SEQ DONE state when seq done
             for l in 0 to 6 loop
             dataReg(l) <= (others => '0');
             end loop;
@@ -249,15 +247,15 @@ end process;
 SignalOutput: process(reset,PeakFound,PeakCount) 
 begin
 loadToRight<='0';
-    if reset = '1' then 
+    if reset = '1' then --reset loop
         enablePeakCount <= '0';
         ResetPeakCount <= '0';
     else    
-        if PeakFound ='1' then 
+        if PeakFound ='1' then  -- enables peak count
             enablePeakCount <= '1';
            -- PeakFound <= '0';
          else 
-            if PeakCount = 3 then
+            if PeakCount = 3 then --loads to right
                 loadToRight<='1';
                 enablePeakCount<='0';
                 ResetPeakCount <= '1';
@@ -274,12 +272,12 @@ DataCounter: process(clk)
 begin 
 if rising_edge(clk) then
     if reset = '1' or PeakFound = '1' then 
-        PeakCount<=0;
+        PeakCount<=0; --reset peakCount once peak is found
      else  
-        if ResetPeakCount = '1' then 
+        if ResetPeakCount = '1' then --reset
             peakCount<=0;
         else
-            if enablePeakCount = '1' then 
+            if enablePeakCount = '1' then  --incrementing peak count
                 if currentState = GET_DATA then 
                     PeakCount<=PeakCount+1;
                 end if;
@@ -294,7 +292,7 @@ Comparator: process(byteReg,dataReg,reset)
 begin
 loadToLeft<='0';
 PeakFound <= '0';
-if TO_INTEGER(unsigned(byteReg(3))) > TO_INTEGER(unsigned(dataReg(3))) then 
+if TO_INTEGER(unsigned(byteReg(3))) > TO_INTEGER(unsigned(dataReg(3))) then  --comparator of byte reg to data reg
     PeakFound <= '1';
     loadToLeft<='1';
 end if;
@@ -306,10 +304,10 @@ begin
 if rising_edge(clk) then 
     if reset = '1' then 
     for m in 0 to 2 loop
-        maxIndexReg(m)<= (others=>'0');
+        maxIndexReg(m)<= (others=>'0'); --set to 0
     end loop;
     else    
-        if PeakFound = '1' then 
+        if PeakFound = '1' then --- int to BCD converter seperating logic by place value holder
             maxIndexReg(2) <= std_logic_vector(TO_UNSIGNED(((byteCount-1)/100),4));
             maxIndexReg(1) <= std_logic_vector(TO_UNSIGNED((((byteCount-1) mod 100)/10),4));
             maxIndexReg(0) <= std_logic_vector(TO_UNSIGNED(((byteCount-1) mod 10),4));
@@ -321,12 +319,11 @@ end process;
 
 
 
-  
+--Sends input to be converted to integer
+numWords<=numwords_bcd;
 --High of CtrlIn changes
 ctrlIndetected <= ctrlIn xor ctrlIndelayed;
 --Output to dataGen
 ctrlOut <= ctrlOutReg;
---Sends input to be converted to integer
-numWords<=numwords_bcd;
 
 end behav;
