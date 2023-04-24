@@ -349,13 +349,13 @@ END PROCESS;
      
       WHEN CHECK_NNN =>           -- State checks if 3 numbers have been recieved
         IF Count = 1 THEN         -- If Main Counter is equal to 1
-          n1 <= rxData;           -- Assign the 1st byte to signal n1
+          n1 <= rxData_reg;           -- Assign the 1st byte to signal n1
           nextState <= CHECK_N1;  -- Then go to 'CHECK_N1' state to check if 1st byte is a number
         ELSIF Count = 2 THEN      -- If Main Counter is equal to 2
-          n2 <= rxData;           -- Assign the 2nd byte to signal n2
+          n2 <= rxData_reg;           -- Assign the 2nd byte to signal n2
           nextState <= CHECK_N2;  -- Then go to 'CHECK_N2' state to check if 2nd byte is a number
         ELSIF Count = 3 THEN      -- If Main Counter is equal to 3
-          n3 <= rxData;           -- Assign the 3rd byte to signal n3
+          n3 <= rxData_reg;           -- Assign the 3rd byte to signal n3
           nextState <= CHECK_N3;  -- Then go to 'CHECK_N3' state to check if 3rd byte is a number
         ELSE
           nextState <= INIT;
