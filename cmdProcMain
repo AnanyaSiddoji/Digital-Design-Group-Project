@@ -163,18 +163,24 @@ dataResToHex: PROCESS(dataResults_reg, lCounter, Res, data1, data2)
 BEGIN    
   IF lCounter /= 0 THEN
     L_array((3*lCounter)-1) <= X"20";                                   -- Adds spaces between every value from dataResults in the array
+  ELSE 
+    L_array(2) <= X"20";
   END IF;
  
   IF ((data1 >= 0) AND (data1 <= 9)) THEN                               -- Checks if the 1st part of the value is a number
     L_array(3*lCounter) <= std_logic_vector(to_unsigned(data1 + 48,8)); -- Coverts the number to ASCII format and assigns it to L_array as an 8 bit logic vector
   ELSIF ((data1 >= 10) AND (data1 <= 15)) THEN                          -- Checks if the 1st part of the value is A,B,C,D,or F
     L_array(3*lCounter) <= std_logic_vector(to_unsigned(data1 + 55,8)); -- Coverts A,B,C,D,or F to their ASCII format & assigns it to L_array as an 8 bit logic vector
+  ELSE 
+    L_array(3*lCounter) <= "00000000";
   END IF;
  
   IF ((data2 >= 0) AND (data2 <= 9)) THEN                                 -- Checks if the 2nd part of the value is a number
     L_array(3*lCounter+1) <= std_logic_vector(to_unsigned(data2 + 48,8)); -- Coverts the number to ASCII format and assigns it to L_array as an 8 bit logic vector
   ELSIF ((data2 >= 10) AND (data2 <= 15)) THEN                            -- Checks if the 2nd part of the value is A,B,C,D,or F
     L_array(3*lCounter+1) <= std_logic_vector(to_unsigned(data2 + 55,8)); -- Coverts A,B,C,D,or F to their ASCII format & assigns it to L_array as an 8 bit logic vector
+  ELSE 
+    L_array(3*lCounter+1) <= "00000000";
   END IF;
 
 END PROCESS;
@@ -277,7 +283,7 @@ END PROCESS;
  
  
   -- NEXT STATE LOGIC
-  nextStateLogic: PROCESS(curState, rxData_reg, rxNow, txDone, BOOL_N1, BOOL_N2, BOOL_N3, byte,dataReady,NNN,lCounter, dataResults_reg, Res)
+  nextStateLogic: PROCESS(curState, rxData_reg, rxNow, txDone, BOOL_N1, BOOL_N2, BOOL_N3, byte,dataReady,NNN,lCounter, dataResults_reg)
   BEGIN
      -- Assign default values
     start  <= '0';
