@@ -214,7 +214,7 @@ BEGIN
 END PROCESS;
 
 -----------------------------------------------------
-NNN_CHECK: PROCESS(n1, n2, n3, clk)
+NNN_CHECK: PROCESS(n1, n2, n3, clk, num1, num2, num3)
 BEGIN
   NNN<= 0;
   BOOL_N1 <= FALSE;
@@ -283,7 +283,7 @@ END PROCESS;
  
  
   -- NEXT STATE LOGIC
-  nextStateLogic: PROCESS(curState, rxData_reg, rxNow, txDone, BOOL_N1, BOOL_N2, BOOL_N3, byte,dataReady,NNN,lCounter, dataResults_reg)
+  nextStateLogic: PROCESS(curState, rxData_reg, rxNow, txDone, BOOL_N1, BOOL_N2, BOOL_N3, byte,dataReady,NNN,lCounter, dataResults_reg, dataReg, Res)
   BEGIN
      -- Assign default values
     start  <= '0';
@@ -392,12 +392,12 @@ END PROCESS;
           nextState <= INIT;
         END IF;
          
-       when WAIT_N3 =>
+       WHEN WAIT_N3 =>
           IF BOOL_N3 = TRUE THEN 
             nextState <= CARRIAGE; 
-          else 
+          ELSE 
             nextState <= WAIT_N3;
-          end if;
+          END IF;
           
       WHEN DATA_ARRAY_1=>                   -- State indexes array and stores each byte from dataResults in signal Res
           Res <= dataResults_reg(lCounter);
