@@ -66,7 +66,7 @@ ARCHITECTURE command OF cmdProc IS
  SIGNAL n1, n2, n3: std_logic_vector(7 DOWNTO 0);
  SIGNAL num1, num2, num3: integer range 0 to 9;
  SIGNAL NNN: integer range 0 to 999;
- SIGNAL en_NNN: bit;
+
 BEGIN
 -----------------------------------------------------  
   -- REGISTERS
@@ -114,7 +114,7 @@ BEGIN
       IF en_echo = '1' THEN  -- Responsible for Echoing Data to user
         txData <= rxData_reg;
       ELSIF curState = CARRIAGE OR curState = CARRIAGE_OUT THEN -- Adds a new line (Carriage Return)
-        txData <= X"24"; --X"0D";
+        txData <= X"0A"; --X"0D";
       ELSIF curState = L_TRANS_1 THEN                           -- prints the list of dataResults (L printing)
          txData <= L_array(Count);
       ELSIF curState = P_TRANS_1 THEN                           -- prints the Peak & its index (P printing)
@@ -227,7 +227,6 @@ BEGIN
   num2 <= 0;
   num3 <= 0;
   
-  IF en_NNN = '1' THEN 
     IF n1(7 DOWNTO 4) = "0011" THEN                 -- Checks if the 1st N is a number
       num1 <= to_integer(unsigned(n1(3 DOWNTO 0))); -- Converts logic vector to integer to use arithmetic and check number validity
       IF (num1 >= 0) AND (num1<= 9) THEN            -- Checks if its a number within range 0 to 9
@@ -264,7 +263,6 @@ BEGIN
         numWords_bcd(0) <= "0000";                  -- Assigns number 0 in BCD to array
       END IF;
     END IF;
- END IF;
 END PROCESS;
 
 -----------------------------------------------------
@@ -297,7 +295,6 @@ END PROCESS;
     res_lCounter <= '0';
     en_count <= '0';
     res_count <= '0';
-    en_NNN <= '0';
    
     CASE curState IS
  
@@ -355,7 +352,6 @@ END PROCESS;
      
       WHEN CHECK_NNN =>           -- State checks if 3 numbers have been recieved
         IF Count = 1 THEN         -- If Main Counter is equal to 1
-          en_NNN <= '1';
           n1 <= rxData_reg;           -- Assign the 1st byte to signal n1
           nextState <= CHECK_N1;  -- Then go to 'CHECK_N1' state to check if 1st byte is a number
         ELSIF Count = 2 THEN      -- If Main Counter is equal to 2
@@ -553,4 +549,5 @@ END;
 -- WRITE IMPROVEMENT SECTION ON REPORT:
 -- TO IMPROVE OUR CODE, WE COULD HAVE SEPARATED OUR COMBINATIONAL LOGIC
 -- FROM OUR OUTPUT LOGIC IN A DIFFERENT PROCESS (BECAUSE IT IS GOOD PRACTICE)
+
 
