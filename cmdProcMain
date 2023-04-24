@@ -114,7 +114,7 @@ BEGIN
       IF en_echo = '1' THEN  -- Responsible for Echoing Data to user
         txData <= rxData_reg;
       ELSIF curState = CARRIAGE OR curState = CARRIAGE_OUT THEN -- Adds a new line (Carriage Return)
-        txData <= X"0D";
+        txData <= X"24"; --X"0D";
       ELSIF curState = L_TRANS_1 THEN                           -- prints the list of dataResults (L printing)
          txData <= L_array(Count);
       ELSIF curState = P_TRANS_1 THEN                           -- prints the Peak & its index (P printing)
@@ -296,13 +296,12 @@ END PROCESS;
     en_count <= '0';
     res_count <= '0';
    
-    Res <= dataResults_reg(lCounter);
-    data1 <= to_integer(unsigned(Res(7 downto 4)));       -- Stores 4 MSB in signal data1
-    data2 <= to_integer(unsigned(Res(3 downto 0)));       -- Stores 4 LSB in signal data2
-    
     CASE curState IS
  
       WHEN INIT =>
+        n1 <= "00000000";
+        n2 <= "00000000";
+        n3 <= "00000000";
         res_count <= '1';         -- Main Counter is reset to zero
         IF rxNow = '1' THEN       -- If data is outputted from Rx
           rxDone <= '1';          -- States that data has been received from Rx
@@ -404,13 +403,13 @@ END PROCESS;
           END IF;
           
       WHEN DATA_ARRAY_1=>                   -- State indexes array and stores each byte from dataResults in signal Res
-          --Res <= dataResults_reg(lCounter);
+          Res <= dataResults_reg(lCounter);
           nextState <= DATA_ARRAY_2;
 
        
       WHEN DATA_ARRAY_2 =>
-        --data1 <= to_integer(unsigned(Res(7 downto 4)));       -- Stores 4 MSB in signal data1
-        --data2 <= to_integer(unsigned(Res(3 downto 0)));       -- Stores 4 LSB in signal data2
+        data1 <= to_integer(unsigned(Res(7 downto 4)));       -- Stores 4 MSB in signal data1
+        data2 <= to_integer(unsigned(Res(3 downto 0)));       -- Stores 4 LSB in signal data2
         IF lCounter /= 6 THEN                                 -- If list Counter is NOT equal to 6                      
           en_lCounter <= '1';                                 -- Enable list Counter
           nextState <= DATA_ARRAY_1;                          -- Then go to 'DATA_ARRAY_1' state to index next byte in dataResults
