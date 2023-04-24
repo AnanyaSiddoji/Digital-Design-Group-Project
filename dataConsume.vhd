@@ -80,6 +80,10 @@ resetRegister<='0';
                        
         when SEQ_DONE =>
         --Restarts system
+        --seqDone <='0';
+        --peakFound <= '0';
+        resetRegister <= '1';
+        
         nextState <= IDLE;        
         
         when others =>
@@ -99,8 +103,12 @@ case currentState IS
  when SEQ_DONE =>
  --Tell Command Processor all bytes processed and peak found
     seqDone <= '1';
+    --dataReg(3)<= '00';
+    
+   -- byteCount <= 0;
     dataResults<=dataReg;
     maxIndex <= maxIndexReg;
+    
  when others =>
     dataReady <='0';
     seqDone <= '0';
@@ -247,11 +255,13 @@ loadToRight<='0';
     else    
         if PeakFound ='1' then 
             enablePeakCount <= '1';
+           -- PeakFound <= '0';
          else 
             if PeakCount = 3 then
                 loadToRight<='1';
                 enablePeakCount<='0';
                 ResetPeakCount <= '1';
+               -- PeakFound<= '0';
             else
                 ResetPeakCount<='0';
             end if;
