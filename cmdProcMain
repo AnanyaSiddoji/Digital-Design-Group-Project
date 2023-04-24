@@ -77,6 +77,8 @@ BEGIN
     ELSIF clk'EVENT AND clk = '1' THEN
       rxData_reg <= rxData;  -- Register used to store rxData
       curState <= nextState;
+    ELSE 
+      curState <= curState;
     END IF;
   END PROCESS;
 
