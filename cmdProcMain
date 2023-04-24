@@ -29,7 +29,7 @@ ARCHITECTURE command OF cmdProc IS
 
  -- STATE DECLARATION
  TYPE STATE_TYPE IS (INIT, RECEIVING, CARRIAGE, CARRIAGE_OUT, WAIT_NNN, L_TRANS_1, L_TRANS_2,P_TRANS_1, P_TRANS_2, DATA_ARRAY_1, DATA_ARRAY_2, CHECK_NNN,
- CHECK_N1, CHECK_N2, CHECK_N3, S_START, WAIT_BYTES,WAIT_1, RECEIVE_BYTES, TRANSMIT_BYTE_1,TRANSMIT_BYTE_2,SPACE ,EQUAL_NNN);
+ CHECK_N1, CHECK_N2, CHECK_N3, S_START, WAIT_BYTES,WAIT_1, RECEIVE_BYTES, TRANSMIT_BYTE_1,TRANSMIT_BYTE_2,SPACE ,EQUAL_NNN, WAIT_N3);
  
  SIGNAL curState, nextState: state_type;
  -- REGISTER SIGNALS
@@ -385,13 +385,20 @@ END PROCESS;
         en_echo <= '1';            -- Enabling echo to echo received byte
         IF BOOL_N3 = TRUE THEN     -- If 3rd byte is a number
           en_dataReg <= '1';       -- Register is enabled to store 3rd number (N3)
-          nextState <= CARRIAGE;   -- Then go to 'CARRIAGE' state to go to a new line after echoing ANNN or aNNN
+          nextState <= WAIT_N3;   -- Then go to 'CARRIAGE' state to go to a new line after echoing ANNN or aNNN
         ELSIF BOOL_N3 = FALSE THEN -- If 3rd byte is NOT a number
           nextState <= INIT;       -- Then go back to initial state
         ELSE
           nextState <= INIT;
         END IF;
          
+       when WAIT_N3 =>
+          IF BOOL_N3 = TRUE THEN 
+            nextState <= CARRIAGE; 
+          else 
+            nextState <= WAIT_N3;
+          end if;
+          
       WHEN DATA_ARRAY_1=>                   -- State indexes array and stores each byte from dataResults in signal Res
           Res <= dataResults_reg(lCounter);
           nextState <= DATA_ARRAY_2;
