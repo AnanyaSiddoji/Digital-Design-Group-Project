@@ -66,7 +66,7 @@ ARCHITECTURE command OF cmdProc IS
  SIGNAL n1, n2, n3: std_logic_vector(7 DOWNTO 0);
  SIGNAL num1, num2, num3: integer range 0 to 9;
  SIGNAL NNN: integer range 0 to 999;
- 
+ SIGNAL en_NNN: bit;
 BEGIN
 -----------------------------------------------------  
   -- REGISTERS
@@ -226,43 +226,45 @@ BEGIN
   num1 <= 0;
   num2 <= 0;
   num3 <= 0;
-  IF n1(7 DOWNTO 4) = "0011" THEN                 -- Checks if the 1st N is a number
-    num1 <= to_integer(unsigned(n1(3 DOWNTO 0))); -- Converts logic vector to integer to use arithmetic and check number validity
-    IF (num1 >= 0) AND (num1<= 9) THEN            -- Checks if its a number within range 0 to 9
-      numWords_bcd(2) <= n1(3 DOWNTO 0);          -- Assigns the 2nd half as its in BCD format to numWords_bcd array
-      BOOL_N1 <= TRUE;                            -- If the 1st N is a number it assigns TRUE for BOOL_N1
-    ELSE                                          -- If the 1st N is not a number
-      BOOL_N1 <= FALSE;                           -- It assigns FALSE for BOOL_N1
-      numWords_bcd(2) <= "0000";                  -- Assigns number 0 in BCD to array
+  
+  IF en_NNN = '1' THEN 
+    IF n1(7 DOWNTO 4) = "0011" THEN                 -- Checks if the 1st N is a number
+      num1 <= to_integer(unsigned(n1(3 DOWNTO 0))); -- Converts logic vector to integer to use arithmetic and check number validity
+      IF (num1 >= 0) AND (num1<= 9) THEN            -- Checks if its a number within range 0 to 9
+        numWords_bcd(2) <= n1(3 DOWNTO 0);          -- Assigns the 2nd half as its in BCD format to numWords_bcd array
+        BOOL_N1 <= TRUE;                            -- If the 1st N is a number it assigns TRUE for BOOL_N1
+      ELSE                                          -- If the 1st N is not a number
+        BOOL_N1 <= FALSE;                           -- It assigns FALSE for BOOL_N1
+        numWords_bcd(2) <= "0000";                  -- Assigns number 0 in BCD to array
+      END IF;
     END IF;
-  END IF;
-     
-  IF n2(7 DOWNTO 4) = "0011" THEN                 -- Checks if the 2nd N is a number
-    num2 <= to_integer(unsigned(n2(3 DOWNTO 0))); -- Converts logic vector to integer to use arithmetic and check number validity
-    IF (num2 >= 0) AND (num2<= 9) THEN            -- Checks if its a number within range 0 to 9
-      numWords_bcd(1) <= n2(3 DOWNTO 0);          -- Assigns the 2nd half as its in BCD format to numWords_bcd array
-      BOOL_N2 <= TRUE;                            -- If the 2nd N is a number it assigns TRUE for BOOL_N2
-    ELSE                                          -- If the 2nd N is not a number
-      BOOL_N2 <= FALSE;                           -- It assigns FALSE for BOOL_N2
-      numWords_bcd(2) <= "0000";
-      numWords_bcd(1) <= "0000";                  -- Assigns number 0 in BCD to array
+       
+    IF n2(7 DOWNTO 4) = "0011" THEN                 -- Checks if the 2nd N is a number
+      num2 <= to_integer(unsigned(n2(3 DOWNTO 0))); -- Converts logic vector to integer to use arithmetic and check number validity
+      IF (num2 >= 0) AND (num2<= 9) THEN            -- Checks if its a number within range 0 to 9
+        numWords_bcd(1) <= n2(3 DOWNTO 0);          -- Assigns the 2nd half as its in BCD format to numWords_bcd array
+        BOOL_N2 <= TRUE;                            -- If the 2nd N is a number it assigns TRUE for BOOL_N2
+      ELSE                                          -- If the 2nd N is not a number
+        BOOL_N2 <= FALSE;                           -- It assigns FALSE for BOOL_N2
+        numWords_bcd(2) <= "0000";
+        numWords_bcd(1) <= "0000";                  -- Assigns number 0 in BCD to array
+      END IF;
     END IF;
-  END IF;
-         
-  IF n3(7 DOWNTO 4) = "0011" THEN                 -- Checks if the 3rd N is a number
-    num3 <= to_integer(unsigned(n3(3 DOWNTO 0))); -- Converts logic vector to integer to use arithmetic and check number validity
-    IF (num3 >= 0) AND (num3<= 9) THEN            -- Checks if its a number within range 0 to 9
-      numWords_bcd(0) <= n3(3 DOWNTO 0);          -- Assigns the 2nd half as its in BCD format to numWords_bcd array
-      BOOL_N3 <= TRUE;                            -- If the 3rd N is a number it assigns TRUE for BOOL_N3
-      NNN <= (num1*100) + (num2*10) + (num3);     -- Positioning all digits (N1,N2,& N3)to the right decimal point  
-    ELSE                                          -- If the 3rd N is not a number
-      BOOL_N3 <= FALSE;                           -- It assigns FALSE for BOOL_N3
-      numWords_bcd(2) <= "0000";
-      numWords_bcd(1) <= "0000";
-      numWords_bcd(0) <= "0000";                  -- Assigns number 0 in BCD to array
+           
+    IF n3(7 DOWNTO 4) = "0011" THEN                 -- Checks if the 3rd N is a number
+      num3 <= to_integer(unsigned(n3(3 DOWNTO 0))); -- Converts logic vector to integer to use arithmetic and check number validity
+      IF (num3 >= 0) AND (num3<= 9) THEN            -- Checks if its a number within range 0 to 9
+        numWords_bcd(0) <= n3(3 DOWNTO 0);          -- Assigns the 2nd half as its in BCD format to numWords_bcd array
+        BOOL_N3 <= TRUE;                            -- If the 3rd N is a number it assigns TRUE for BOOL_N3
+        NNN <= (num1*100) + (num2*10) + (num3);     -- Positioning all digits (N1,N2,& N3)to the right decimal point  
+      ELSE                                          -- If the 3rd N is not a number
+        BOOL_N3 <= FALSE;                           -- It assigns FALSE for BOOL_N3
+        numWords_bcd(2) <= "0000";
+        numWords_bcd(1) <= "0000";
+        numWords_bcd(0) <= "0000";                  -- Assigns number 0 in BCD to array
+      END IF;
     END IF;
-  END IF;
- 
+ END IF;
 END PROCESS;
 
 -----------------------------------------------------
@@ -295,6 +297,7 @@ END PROCESS;
     res_lCounter <= '0';
     en_count <= '0';
     res_count <= '0';
+    en_NNN <= '0';
    
     CASE curState IS
  
@@ -352,6 +355,7 @@ END PROCESS;
      
       WHEN CHECK_NNN =>           -- State checks if 3 numbers have been recieved
         IF Count = 1 THEN         -- If Main Counter is equal to 1
+          en_NNN <= '1';
           n1 <= rxData_reg;           -- Assign the 1st byte to signal n1
           nextState <= CHECK_N1;  -- Then go to 'CHECK_N1' state to check if 1st byte is a number
         ELSIF Count = 2 THEN      -- If Main Counter is equal to 2
@@ -549,3 +553,4 @@ END;
 -- WRITE IMPROVEMENT SECTION ON REPORT:
 -- TO IMPROVE OUR CODE, WE COULD HAVE SEPARATED OUR COMBINATIONAL LOGIC
 -- FROM OUR OUTPUT LOGIC IN A DIFFERENT PROCESS (BECAUSE IT IS GOOD PRACTICE)
+
