@@ -82,7 +82,7 @@ resetRegister<='0';
         --Restarts system
         --seqDone <='0';
         --peakFound <= '0';
-        resetRegister <= '1';
+        resetRegister <= '1'; --resets the data Register
         
         nextState <= IDLE;        
         
