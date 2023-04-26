@@ -157,8 +157,9 @@ END PROCESS;
 
 -----------------------------------------------------
 -- L PRINTING FUNCTION: Creates an array & adds each value from dataResults in ASCII format with spaces in between
-dataResToHex: PROCESS(lCounter,data1, data2)
+dataResToHex: PROCESS(lCounter,data1, data2, clk)
 BEGIN    
+IF clk'EVENT AND clk = '1' THEN
   IF lCounter /= 0 THEN
     L_array((3*lCounter)-1) <= X"20";                                   -- Adds spaces between every value from dataResults in the array
   END IF;
@@ -174,7 +175,7 @@ BEGIN
   ELSIF ((data2 >= 10) AND (data2 <= 15)) THEN                            -- Checks if the 2nd part of the value is A,B,C,D,or F
     L_array(3*lCounter+1) <= std_logic_vector(to_unsigned(data2 + 55,8)); -- Coverts A,B,C,D,or F to their ASCII format & assigns it to L_array as an 8 bit logic vector
   END IF;
-
+END IF;
 END PROCESS;
  
 -----------------------------------------------------
@@ -272,7 +273,7 @@ END PROCESS;
 
 -----------------------------------------------------
   -- NEXT STATE LOGIC
-  nextStateLogic: PROCESS(curState, rxData_reg, rxNow, txDone, BOOL_N1, BOOL_N2, BOOL_N3, byte,dataReady)
+  nextStateLogic: PROCESS(curState, rxData_reg, rxNow, txDone, BOOL_N1, BOOL_N2, BOOL_N3, byte,dataReady,NNN,lCounter, dataResults_reg, dataReg, Res)
   BEGIN
      -- Assign default values
     start  <= '0';
