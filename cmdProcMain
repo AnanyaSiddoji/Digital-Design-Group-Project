@@ -126,7 +126,6 @@ BEGIN
      
       ELSE            -- If none of the 'IF conditions' are met
         txNow <= '0'; -- No transmission occurs
-        txData <= "00000000";
       END IF;
     END IF;
   END IF;
@@ -158,7 +157,7 @@ END PROCESS;
 
 -----------------------------------------------------
 -- L PRINTING FUNCTION: Creates an array & adds each value from dataResults in ASCII format with spaces in between
-dataResToHex: PROCESS(lCounter,data1, data2)
+dataResToHex: PROCESS(lCounter,data1, data2, Res, rxData_reg)
 BEGIN    
   IF lCounter /= 0 THEN
     L_array((3*lCounter)-1) <= X"20";                                   -- Adds spaces between every value from dataResults in the array
@@ -538,3 +537,4 @@ END;
 -- WRITE IMPROVEMENT SECTION ON REPORT:
 -- TO IMPROVE OUR CODE, WE COULD HAVE SEPARATED OUR COMBINATIONAL LOGIC
 -- FROM OUR OUTPUT LOGIC IN A DIFFERENT PROCESS (BECAUSE IT IS GOOD PRACTICE)
+
