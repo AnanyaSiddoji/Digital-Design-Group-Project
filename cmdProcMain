@@ -34,7 +34,7 @@ ARCHITECTURE command OF cmdProc IS
  SIGNAL curState, nextState: state_type;
  -- REGISTER SIGNALS
  SIGNAL rxData_reg: std_logic_vector(7 DOWNTO 0); -- Added signal data_reg for input to remain steady for at least 1 clock cycle
- SIGNAL dataReg,NNN_reg, Res_reg: std_logic_vector(7 DOWNTO 0);
+ SIGNAL dataReg, Res_reg: std_logic_vector(7 DOWNTO 0);
  SIGNAL var_n1,var_n2,var_n3: std_logic_vector(7 DOWNTO 0):= "00000000";
  SIGNAL en_dataReg,en_NNN,en_Res: bit;
  
@@ -323,7 +323,9 @@ END PROCESS;
     en_count <= '0';
     res_count <= '0';
     en_NNN <= '0';
-   
+    n1 <= var_n1;  
+    n2 <= var_n2; 
+    n3 <= var_n3;
     CASE curState IS
  
       WHEN INIT =>
