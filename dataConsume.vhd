@@ -41,10 +41,13 @@ begin
 StateChange: process(currentState,start,ctrlInDetected,numWordCount) 
 begin
 resetShifter<='0';
-resetRegister<='0'; -- assigning defaults at the beginning to avoid assigning in every branch
+resetRegister<='0';
+	 -- assigning defaults at the beginning to avoid assigning in every branch
     case currentState is
         
         when IDLE => --sent back here when resetting
+        --resetShifter<='1';
+        --resetRegister<='1';
             if start = '1' then --Start two phase protocol
                 nextState <= FETCH;
             else --Wait for start = 1
@@ -71,12 +74,16 @@ resetRegister<='0'; -- assigning defaults at the beginning to avoid assigning in
             --Requests another byte
                 nextState <= FETCH; 
             else 
-            --Halts data retrieval 
+            --Halts data retrieval while Command Processor communicates with PC
                 nextState <= DATA_READY;
             end if;
                        
         when SEQ_DONE =>
-        resetRegister <= '1'; -- to make dataReg reset
+        --Restarts system
+        --seqDone <='0';
+        --peakFound <= '0';
+        resetRegister <= '1'; --resets the data Register
+        
         nextState <= IDLE;        
         
         when others =>
@@ -86,12 +93,8 @@ resetRegister<='0'; -- assigning defaults at the beginning to avoid assigning in
 end process;
 
 
-StateOutputs:	process (currentState, byteReg, maxIndexReg, dataReg)
+StateOutputs:	process (currentState)
 begin 
-dataResults <= (X"00", X"00", X"00", X"00", X"00", X"00", X"00");
-dataReady <= '0';
-seqDone <= '0';
-
 case currentState IS
  when DATA_READY => 
  --Update output lines, signal data is valid 
@@ -100,6 +103,8 @@ case currentState IS
  when SEQ_DONE =>
  --Tell Command Processor all bytes processed and peak found
     seqDone <= '1';
+   --dataReg(3)<= '00'; --did not work
+   -- byteCount <= 0;
     dataResults<=dataReg;
     maxIndex <= maxIndexReg;
     
@@ -241,8 +246,6 @@ end process;
 
 SignalOutput: process(reset,PeakFound,PeakCount) 
 begin
-enablePeakCount <= '0';
-resetPeakCount <= '0';
 loadToRight<='0';
     if reset = '1' then --reset loop
         enablePeakCount <= '0';
@@ -250,11 +253,13 @@ loadToRight<='0';
     else    
         if PeakFound ='1' then  -- enables peak count
             enablePeakCount <= '1';
+           -- PeakFound <= '0';
          else 
             if PeakCount = 3 then --loads to right
                 loadToRight<='1';
                 enablePeakCount<='0';
                 ResetPeakCount <= '1';
+               -- PeakFound<= '0';
             else
                 ResetPeakCount<='0';
             end if;
@@ -296,7 +301,6 @@ end process;
 
 Peak_index: process(clk)
 begin
-maxIndexReg <= (X"0",X"0",X"0");
 if rising_edge(clk) then 
     if reset = '1' then 
     for m in 0 to 2 loop
