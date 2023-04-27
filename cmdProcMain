@@ -303,8 +303,6 @@ END PROCESS;
         END IF;
      
       WHEN RECEIVING =>
-        data1 <= data1;
-        data2 <= data2;
         en_echo <= '1';                                  -- Enabling echo to echo any received input data
         IF rxData_reg = X"41" OR rxData_reg = X"61" THEN -- Detects A or a in ASCII
           en_dataReg <= '1';                             -- Register is enabled to store A or a
@@ -316,9 +314,7 @@ END PROCESS;
           nextState <= INIT;                             -- Go back to initial state
         END IF;
 
-    WHEN CARRIAGE => 
-      data1 <= data1;
-      data2 <= data2;                                                                     -- State adds a new line
+    WHEN CARRIAGE =>                                                                     -- State adds a new line
       res_count <= '1';                                                                  -- Main Counter is reset to zero
       IF txDone = '0' THEN                                                               -- If a new line is NOT added
         nextState <= CARRIAGE;                                                           -- Remain in 'CARRIAGE' state to add a new line
@@ -333,9 +329,7 @@ END PROCESS;
       END IF;
      
        
-      WHEN WAIT_NNN =>  
-        data1 <= data1;
-        data2 <= data2;          -- State receives NNN
+      WHEN WAIT_NNN =>            -- State receives NNN
         IF rxNow = '1' THEN       -- If data is outputted from Rx
           rxDone <= '1';          -- State that data has been received from Rx
           en_count <= '1';        -- Increment Main Counter
@@ -346,11 +340,9 @@ END PROCESS;
           nextState <= INIT;
         END IF;
      
-      WHEN CHECK_NNN =>  
-        data1 <= data1;
-        data2 <= data2;         -- State checks if 3 numbers have been recieved
+      WHEN CHECK_NNN =>           -- State checks if 3 numbers have been recieved
         IF Count = 1 THEN         -- If Main Counter is equal to 1
-          n1 <= rxData_reg;           -- Assign the 1st byte to signal n1
+          n1 <= rxData_reg;       -- Assign the 1st byte to signal n1
           nextState <= CHECK_N1;  -- Then go to 'CHECK_N1' state to check if 1st byte is a number
         ELSIF Count = 2 THEN      -- If Main Counter is equal to 2
           n2 <= rxData_reg;           -- Assign the 2nd byte to signal n2
@@ -362,9 +354,7 @@ END PROCESS;
           nextState <= INIT;
         END IF;
        
-      WHEN CHECK_N1 =>  
-        data1 <= data1;
-        data2 <= data2;           -- State checks if 1st byte is a number
+      WHEN CHECK_N1 =>             -- State checks if 1st byte is a number
         en_echo <= '1';            -- Enabling echo to echo received byte
         IF BOOL_N1 = TRUE THEN     -- If 1st byte is a number
           nextState <= WAIT_NNN;   -- Then go to 'WAIT_NNN' to receive 2nd byte (i.e., N2)
@@ -374,9 +364,7 @@ END PROCESS;
           nextState <= INIT;
         END IF;
        
-      WHEN CHECK_N2 =>  
-        data1 <= data1;
-        data2 <= data2;           -- State checks if 2nd byte is a number
+      WHEN CHECK_N2 =>             -- State checks if 2nd byte is a number
         en_echo <= '1';            -- Enabling echo to echo received byte
         IF BOOL_N2 = TRUE THEN     -- If 2nd byte is a number
           nextState <= WAIT_NNN;   -- Then go to 'WAIT_NNN' to receive 3rd byte (i.e., N3)
@@ -386,13 +374,11 @@ END PROCESS;
           nextState <= INIT;
         END IF;
          
-      WHEN CHECK_N3 =>
-        data1 <= data1;
-        data2 <= data2;             -- State checks if 3rd byte is a number
+      WHEN CHECK_N3 =>             -- State checks if 3rd byte is a number
         en_echo <= '1';            -- Enabling echo to echo received byte
         IF BOOL_N3 = TRUE THEN     -- If 3rd byte is a number
           en_dataReg <= '1';       -- Register is enabled to store 3rd number (N3)
-          nextState <= WAIT_N3;   -- Then go to 'CARRIAGE' state to go to a new line after echoing ANNN or aNNN
+          nextState <= WAIT_N3;    -- Then go to 'CARRIAGE' state to go to a new line after echoing ANNN or aNNN
         ELSIF BOOL_N3 = FALSE THEN -- If 3rd byte is NOT a number
           nextState <= INIT;       -- Then go back to initial state
         ELSE 
@@ -401,8 +387,6 @@ END PROCESS;
          
          
       WHEN WAIT_N3 =>
-          data1 <= data1;
-          data2 <= data2;
           IF BOOL_N3 = TRUE THEN 
             nextState <= CARRIAGE;
           ELSE 
@@ -411,8 +395,6 @@ END PROCESS;
           
           
       WHEN DATA_ARRAY_1=>                   -- State indexes array and stores each byte from dataResults in signal Res
-          data1 <= data1;
-          data2 <= data2;
           Res <= dataResults_reg(lCounter);
           nextState <= DATA_ARRAY_2;
 
@@ -434,8 +416,6 @@ END PROCESS;
         END IF;
        
       WHEN L_TRANS_1 =>
-        data1 <= data1;
-        data2 <= data2;
         IF txDone = '0' THEN      -- If data has not been transmitted
           nextState <= L_TRANS_1; -- Remain in 'L_TRANS_1' state
         ELSIF txDone = '1' THEN   -- If data is successfully transmitted
@@ -445,8 +425,6 @@ END PROCESS;
         END IF;
        
       WHEN L_TRANS_2 =>
-        data1 <= data1;
-        data2 <= data2;
         IF Count /= 19 THEN          -- If counter is NOT equal to 19 (L_Array size)
           en_count <= '1';           -- Increment Main Counter  
           nextState <= L_TRANS_1;    -- Then go back to 'L_TRANS_1' to transmit list (i.e,print L)
@@ -457,8 +435,6 @@ END PROCESS;
         END IF;
          
       WHEN CARRIAGE_OUT =>           -- State adds a new line
-        data1 <= data1;
-        data2 <= data2;
         IF txDone = '0' THEN         -- If a new line is NOT added
           nextState <= CARRIAGE_OUT; -- Remain in 'CARRIAGE_OUT' state to add a new line
         ELSIF txDone = '1' THEN      -- If new line has been added  
@@ -468,8 +444,6 @@ END PROCESS;
         END IF;
        
       WHEN P_TRANS_1 => 
-        data1 <= data1;
-        data2 <= data2; 
         IF txDone = '0' THEN      -- If data has not been transmitted
           nextState <= P_TRANS_1; -- Remain in 'P_TRANS_1' state
         ELSIF txDone = '1' THEN   -- If data is successfully transmitted
@@ -479,8 +453,6 @@ END PROCESS;
         END IF;
        
       WHEN P_TRANS_2 =>
-        data1 <= data1;
-        data2 <= data2;
         IF Count /= 5 THEN           -- If counter is NOT equal to 5 (P_Array size)
           en_count <= '1';           -- Incremment Main Counter
           nextState <= P_TRANS_1;    -- Then go back to 'P_TRANS_1' to transmit peak & its Index (i.e,print P)
@@ -491,14 +463,10 @@ END PROCESS;
         END IF;
        
       WHEN S_START =>
-        data1 <= data1;
-        data2 <= data2;
         start <= '1';            -- Signals dataPro that cmdPro is ready to receive requested number of bytes
         nextState <= WAIT_BYTES; -- Then go to 'WAIT_BYTES' state
 
       WHEN WAIT_BYTES =>              -- State waits for bytes from data Processor
-        data1 <= data1;
-        data2 <= data2;
         IF dataReady = '1' THEN       -- If byte is ready to be received from data processor
           en_count <= '1';            -- enable Main Counter
           nextState <= RECEIVE_BYTES; -- Then go to 'RECEIVE_BYTES' state to get each byte ready for transmission
@@ -509,8 +477,6 @@ END PROCESS;
         END IF;
 
       WHEN RECEIVE_BYTES =>                  
-                      data1 <= data1;
-        data2 <= data2;
         byte1 <= to_integer(unsigned(byte(7 DOWNTO 4))); -- Stores 4 MSB in signal byte1  
         byte2 <= to_integer(unsigned(byte(3 DOWNTO 0))); -- Stores 4 LSB in signal byte2
         IF txDone = '1' THEN                             -- If data is successfully transmitted
@@ -521,9 +487,7 @@ END PROCESS;
           nextState <= INIT;
         END IF;
        
-      WHEN TRANSMIT_BYTE_1 =>
-        data1 <= data1;
-        data2 <= data2;           -- State Transmits the 1st byte
+      WHEN TRANSMIT_BYTE_1 =>           -- State Transmits the 1st byte
         IF txDone = '1' THEN            -- If txDone is still high
           nextState <= TRANSMIT_BYTE_1; -- Remain in 'TRANSMIT_BYTE_1' state
         ELSIF txDone = '0' THEN         -- If txDone is low and the 1st byte has been transmitted
@@ -532,18 +496,14 @@ END PROCESS;
           nextState <= INIT;
         END IF;
 
-      WHEN WAIT_1 =>
-        data1 <= data1;
-        data2 <= data2;                    -- State waits for 1st byte to be successfully transmitted to transmit 2nd byte  
+      WHEN WAIT_1 =>                    -- State waits for 1st byte to be successfully transmitted to transmit 2nd byte  
         IF txDone = '1' THEN            -- If 1st byte has been successfully transmitted
           nextState <= TRANSMIT_BYTE_2; -- Go to 'TRANSMIT_BYTE_2' state to transmit 2nd byte
         ELSE 
           nextState <= WAIT_1;
         END IF;
      
-      WHEN TRANSMIT_BYTE_2 =>
-        data1 <= data1;
-        data2 <= data2;           -- State Transmits the 2nd byte
+      WHEN TRANSMIT_BYTE_2 =>           -- State Transmits the 2nd byte
         IF txDone = '1' THEN            -- If txDone is still high
           nextState <= TRANSMIT_BYTE_2; -- Remain in 'TRANSMIT_BYTE_2' state
         ELSIF txDone = '0' THEN         -- If txDone is low and the 2nd byte has been transmitted
@@ -552,9 +512,7 @@ END PROCESS;
           nextState <= INIT;
         END IF;
        
-      WHEN SPACE =>
-        data1 <= data1;
-        data2 <= data2;               -- State adds spaces between bytes transmitted  
+      WHEN SPACE =>               -- State adds spaces between bytes transmitted  
         IF txDone = '0' THEN      -- If space is NOT added/transmitted
           nextState <= SPACE;     -- Remain in 'SPACE' state to add/transmit space
         ELSIF txDone = '1' THEN   -- If space is added/transmitted
@@ -563,9 +521,7 @@ END PROCESS;
           nextState <= INIT;
         END IF;
        
-      WHEN EQUAL_NNN =>
-        data1 <= data1;
-        data2 <= data2;      
+      WHEN EQUAL_NNN =>    
         IF Count = NNN THEN      -- If bytes transmitted are equal to NNN
           res_count <= '1';      -- Main Counter is reset to zero
           nextState <= INIT;     -- Then go back to initial state
@@ -576,8 +532,6 @@ END PROCESS;
         END IF;
    
       WHEN OTHERS =>
-        data1 <= data1;
-        data2 <= data2;
         nextState <= INIT;  -- Accounts for undefined states
    
     END CASE;
